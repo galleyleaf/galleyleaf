@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex">
+  <title>Publish the book</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+  <main class="admin">
+    <nav class="admin-nav" aria-label="Admin">
+      <a href="../">Library</a>
+      <a href="./">Readers and comments</a>
+      <a href="upload.html" aria-current="page">Publish the book</a>
+    </nav>
+    <h1>Publish the book</h1>
+    <p>Choose the book’s Markdown file. It’s split into chapters and paragraphs in your browser, then saved to Firestore, where only approved readers can open it. Publishing again replaces the current text. Readers’ comments are tied to paragraph numbers, so they may point to different paragraphs if you add or remove paragraphs.</p>
+
+    <p class="status" id="status">Checking your account…</p>
+
+    <div id="tools" hidden>
+      <label class="file-drop">
+        <strong>Book file (.md)</strong>
+        <input type="file" id="file" accept=".md,.markdown,text/markdown,text/plain">
+      </label>
+    </div>
+
+    <section id="preview" hidden>
+      <div class="row">
+        <div style="flex:1;min-width:12rem">
+          <strong id="preview-title"></strong>
+          <p id="preview-author"></p>
+        </div>
+        <button type="button" class="btn btn-primary" id="btn-publish">Publish to readers</button>
+      </div>
+      <table class="summary">
+        <thead><tr><th>Section</th><th>Paragraphs</th><th>Scene breaks</th></tr></thead>
+        <tbody id="preview-rows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script type="module" src="upload.js"></script>
+</body>
+</html>

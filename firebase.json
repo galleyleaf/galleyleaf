@@ -1,0 +1,37 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "REPLACE_WITH_BOOK_TITLE",
+        "supportEmail": "REPLACE_WITH_YOUR_EMAIL",
+        "authorizedRedirectUris": [
+          "http://localhost"
+        ]
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "book.md",
+      "CLAUDE.md",
+      "README.md",
+      "LICENSE",
+      "tests/**",
+      "docs/**",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}

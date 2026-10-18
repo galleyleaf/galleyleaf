@@ -1,0 +1,241 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: Firebase Auth uid
+// Fields:
+//   - displayName: string (required, 0-100 chars)
+//   - email: string (required, equals the sign-in email or "")
+//   - photoURL: string (required, "" or a https://lh3.googleusercontent.com/ URL, max 500 chars)
+//   - approved: bool (required, true on create; admins can revoke it)
+//   - admin: bool (required, false on create; only changed in the console)
+//   - createdAt: timestamp (required, server time on create, immutable)
+//   Clients may create their own profile once, only via verified Google
+//   sign-in, and never update or delete it.
+//   Admins may read all profiles and change only the `approved` flag
+//   (from admin/index.html). The `admin` flag is only changed in the console.
+//
+// Subcollection: users/{uid}/comments
+// Document ID: auto id
+// Fields:
+//   - chapterId: string (required, 1-100 chars, immutable)
+//   - paragraphIndex: int (required, 0-5000, immutable)
+//   - text: string (required, 1-2000 chars)
+//   - createdAt: timestamp (required, server time on create, immutable)
+//   - updatedAt: timestamp (required, server time on every write)
+//   Only the owning, approved user can create or edit. The owner and admins can
+//   read (admins via a collection group query on "comments"). The owner and
+//   admins can delete (admins remove spam).
+//
+// Collection: book
+// Document ID: "meta"
+// Fields:
+//   - title: string (1-200), author: string (0-200), dedication: string (0-5000)
+//   - chapters: list (<= 300) of { id, title, order, paragraphCount }
+//   - updatedAt: timestamp (server time)
+//   Readable by approved users and admins; writable by admins only.
+//
+// Collection: chapters
+// Document ID: slug (e.g. "chapter-1")
+// Fields:
+//   - title: string (1-200)
+//   - order: int (0-1000)
+//   - paragraphs: list of HTML-escaped strings (1-5000 items)
+//   - breaks: list of ints (0-5000 items) — paragraph indexes preceded by a scene break
+//   Readable by approved users; writable by admins only.
+//   Note: rules cannot iterate lists, so individual paragraph strings are
+//   validated by the admin upload page, and the reader app re-sanitizes them.
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    // Approval and admin flags live on the user's own profile document,
+    // which clients can never modify after creation.
+    function isApproved() {
+      return isAuthenticated()
+        && exists(userPath())
+        && get(userPath()).data.approved == true;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+        && exists(userPath())
+        && get(userPath()).data.admin == true;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isStringWithin(value, minLen, maxLen) {
+      return value is string && value.size() >= minLen && value.size() <= maxLen;
+    }
+
+    // Profile photos may only point at Google's avatar host, so the admin page
+    // never loads an image from a server a reader controls.
+    function isGooglePhotoUrl(value) {
+      return value == ''
+        || (isStringWithin(value, 1, 500)
+          && value.matches('^https://lh3\\.googleusercontent\\.com/.*$'));
+    }
+
+    function isVerifiedGoogleUser() {
+      return request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      let fields = ['displayName', 'email', 'photoURL', 'approved', 'admin', 'createdAt'];
+      return hasOnlyAllowedFields(fields)
+        && hasRequiredFields(fields)
+        && isStringWithin(data.displayName, 0, 100)
+        && isStringWithin(data.email, 0, 254)
+        && isGooglePhotoUrl(data.photoURL)
+        && data.approved is bool
+        && data.admin is bool
+        && data.createdAt is timestamp;
+    }
+
+    function isValidComment(data) {
+      let fields = ['chapterId', 'paragraphIndex', 'text', 'createdAt', 'updatedAt'];
+      return hasOnlyAllowedFields(fields)
+        && hasRequiredFields(fields)
+        && isStringWithin(data.chapterId, 1, 100)
+        && data.paragraphIndex is int
+        && data.paragraphIndex >= 0
+        && data.paragraphIndex <= 5000
+        && isStringWithin(data.text, 1, 2000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
+    }
+
+    function isValidMeta(data) {
+      let fields = ['title', 'author', 'dedication', 'chapters', 'updatedAt'];
+      return hasOnlyAllowedFields(fields)
+        && hasRequiredFields(fields)
+        && isStringWithin(data.title, 1, 200)
+        && isStringWithin(data.author, 0, 200)
+        && isStringWithin(data.dedication, 0, 5000)
+        && data.chapters is list
+        && data.chapters.size() <= 300
+        && data.updatedAt == request.time;
+    }
+
+    function isValidChapter(data) {
+      let fields = ['title', 'order', 'paragraphs', 'breaks'];
+      return hasOnlyAllowedFields(fields)
+        && hasRequiredFields(fields)
+        && isStringWithin(data.title, 1, 200)
+        && data.order is int
+        && data.order >= 0
+        && data.order <= 1000
+        && data.paragraphs is list
+        && data.paragraphs.size() >= 1
+        && data.paragraphs.size() <= 5000
+        && data.breaks is list
+        && data.breaks.size() <= 5000;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can only see their own profile (it contains their email).
+      // Admins can list all profiles to manage approvals.
+      allow read: if isOwner(userId) || isAdmin();
+
+      // First login: create own profile, approved by default and non-admin,
+      // with the real sign-in email and server timestamp. Only verified Google
+      // accounts qualify, so enabling another sign-in method can't grant access.
+      allow create: if isOwner(userId)
+        && isVerifiedGoogleUser()
+        && isValidUser(request.resource.data)
+        && request.resource.data.approved == true
+        && request.resource.data.admin == false
+        && request.resource.data.email == request.auth.token.get('email', '')
+        && request.resource.data.createdAt == request.time;
+
+      // Admins can grant or revoke approval and nothing else.
+      // The admin flag itself is managed only from the Firebase console.
+      allow update: if isAdmin()
+        && isValidUser(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved']);
+
+      allow delete: if false;
+
+      match /comments/{commentId} {
+        allow read: if isOwner(userId) && isApproved();
+
+        allow create: if isOwner(userId)
+          && isApproved()
+          && isValidComment(request.resource.data)
+          && request.resource.data.createdAt == request.time;
+
+        allow update: if isOwner(userId)
+          && isApproved()
+          && isValidComment(request.resource.data)
+          && areImmutableFieldsUnchanged(['chapterId', 'paragraphIndex', 'createdAt'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'updatedAt']);
+
+        // Owners delete their own; admins can remove any comment (spam cleanup).
+        allow delete: if (isOwner(userId) && isApproved()) || isAdmin();
+      }
+    }
+
+    match /book/{docId} {
+      allow read: if isApproved() || isAdmin();
+      allow create, update: if docId == 'meta' && isAdmin() && isValidMeta(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /chapters/{chapterId} {
+      allow read: if isApproved() || isAdmin();
+      allow create, update: if isAdmin()
+        && chapterId.size() <= 100
+        && isValidChapter(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Admins can read every reader's comments (collection group query).
+    match /{path=**}/comments/{commentId} {
+      allow read: if isAdmin();
+    }
+
+    // Everything else is denied by default.
+  }
+}

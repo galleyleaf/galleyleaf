@@ -1,0 +1,15 @@
+# Firebase CLI deploy cache
+.firebase/
+*.log
+
+# Browser test sessions and snapshots
+.playwright-cli/
+
+# Personal Claude Code settings (project settings.json is shared)
+.claude/settings.local.json
+
+.DS_Store
+node_modules/
+
+# Your manuscript: upload it from /admin/upload.html, never commit it
+book.md
