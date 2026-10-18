@@ -136,6 +136,15 @@ else
   info "  us-central1 (USA)   europe-west1 (Belgium)   southamerica-east1 (São Paulo)   asia-northeast1 (Tokyo)"
   info "Full list: npx -y firebase-tools@latest firestore:locations"
   ask location "Region" "us-central1"
+
+  # Save the answers now, so a rerun after a failure continues with the same project.
+  if [ "$DRY_RUN" = 0 ]; then
+    TITLE="$title" OWNER="$owner" PROJECT="$project" LOCATION="$location" node -e '
+      const e = process.env;
+      require("fs").writeFileSync("book.config.json", JSON.stringify(
+        { title: e.TITLE, ownerEmail: e.OWNER, projectId: e.PROJECT, location: e.LOCATION }, null, 2) + "\n");'
+    ok "Saved your answers to $CONFIG"
+  fi
 fi
 
 # ---------- 3. Firebase project ----------
@@ -144,16 +153,25 @@ step "Firebase project"
 if "${FB[@]}" apps:list WEB --project "$project" --json >/dev/null 2>&1; then
   ok "Using existing project $project"
 else
-  info "Creating project $project (this takes a minute)..."
   display=$(printf '%s' "$title" | sed -E "s/[^A-Za-z0-9 !'-]//g" | cut -c1-30)
   [ ${#display} -ge 4 ] || display="Galleyleaf book"
-  if ! run "${FB[@]}" projects:create "$project" --display-name "$display" --non-interactive; then
-    fail "The project couldn't be created." \
-      "- If the id is taken, run ./setup.sh --reconfigure and choose another." \
-      "- If it mentions terms of service, open https://console.firebase.google.com, accept the terms once, and run ./setup.sh again." \
-      "- Google limits how many projects one account can create. Delete unused ones at https://console.cloud.google.com/cloud-resource-manager"
+  info "Creating project $project (this takes a minute)..."
+  if run "${FB[@]}" projects:create "$project" --display-name "$display" --non-interactive; then
+    ok "Created project $project"
+  else
+    # projects:create makes the Google Cloud project first, then adds Firebase to
+    # it. If the second part failed (or this is a rerun), only Firebase is missing.
+    info "Adding Firebase to the Google Cloud project $project..."
+    run "${FB[@]}" projects:addfirebase "$project" || fail "Firebase couldn't be set up for $project." \
+      "Most likely, $account hasn't accepted Firebase's terms of service yet:" \
+      "  1. Open https://console.firebase.google.com signed in as $account." \
+      "  2. Click \"Create a project\" (or \"Add project\") and accept the Firebase terms on the first screen." \
+      "     You can close it after that; you don't need to finish creating a project there." \
+      "  3. Run ./setup.sh again. It continues with the same project." \
+      "If that doesn't help, the id may belong to someone else: run ./setup.sh --reconfigure and choose another." \
+      "Google also limits how many projects one account can create: https://console.cloud.google.com/cloud-resource-manager"
+    ok "Firebase added to $project"
   fi
-  ok "Created project $project"
 fi
 
 # ---------- 4. Database ----------

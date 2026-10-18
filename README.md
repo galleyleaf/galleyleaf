@@ -47,7 +47,10 @@ From `https://<your-project>.web.app/admin/` you can:
 
 **If something goes wrong:**
 - **Setup stops with an error.** Read the message: it says what to do. Then run `./setup.sh` again; it skips what's already done.
-- **It mentions terms of service.** Open [console.firebase.google.com](https://console.firebase.google.com/) once, accept the terms, and run `./setup.sh` again.
+- **"Firebase couldn't be set up" or "caller does not have permission".** Your Google account probably hasn't accepted Firebase's terms yet. To fix it:
+  1. Open [console.firebase.google.com](https://console.firebase.google.com/) with the same account.
+  2. Click **Create a project** and accept the terms on the first screen. You can close it after that.
+  3. Run `./setup.sh` again. It continues with the same project.
 - **You want to see what would happen first.** Run `./setup.sh --dry-run`. It only shows the steps.
 - **You want to change your answers.** Run `./setup.sh --reconfigure`.
 - **You signed in to your site before running setup.** Your account was created without admin rights. In the [Firebase console](https://console.firebase.google.com/), open **Firestore Database** › `users`, find your email and set `admin` to `true`.
