@@ -11,7 +11,8 @@ rules_version = '2';
 //   - email: string (required, equals the sign-in email or "")
 //   - photoURL: string (required, "" or a https://lh3.googleusercontent.com/ URL, max 500 chars)
 //   - approved: bool (required, true on create; admins can revoke it)
-//   - admin: bool (required, false on create; only changed in the console)
+//   - admin: bool (required; false on create, except the site owner may
+//     create their own profile with true; otherwise changed only in the console)
 //   - createdAt: timestamp (required, server time on create, immutable)
 //   Clients may create their own profile once, only via verified Google
 //   sign-in, and never update or delete it.
@@ -109,6 +110,14 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
+    // Bootstrap admin: setup.sh fills in the placeholder below with the author's
+    // (lowercased) Google email when it deploys. The placeholder matches no
+    // real account, so a copy deployed without setup.sh has no bootstrap admin.
+    function isSiteOwner() {
+      return isVerifiedGoogleUser()
+        && request.auth.token.get('email', '').lower() == '__OWNER_EMAIL__';
+    }
+
     function areImmutableFieldsUnchanged(fields) {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
     }
@@ -179,14 +188,15 @@ service cloud.firestore {
       // Admins can list all profiles to manage approvals.
       allow read: if isOwner(userId) || isAdmin();
 
-      // First login: create own profile, approved by default and non-admin,
+      // First login: create own profile, approved by default and non-admin
+      // (only the verified site owner may start as admin),
       // with the real sign-in email and server timestamp. Only verified Google
       // accounts qualify, so enabling another sign-in method can't grant access.
       allow create: if isOwner(userId)
         && isVerifiedGoogleUser()
         && isValidUser(request.resource.data)
         && request.resource.data.approved == true
-        && request.resource.data.admin == false
+        && (request.resource.data.admin == false || isSiteOwner())
         && request.resource.data.email == request.auth.token.get('email', '')
         && request.resource.data.createdAt == request.time;
 

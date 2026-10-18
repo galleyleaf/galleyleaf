@@ -10,7 +10,7 @@ Galleyleaf is a small website that you deploy into your own free Firebase projec
 - **Discourages casual copying.** Text can't be selected, copied or printed from the reader.
 - **Free to run.** Everything fits in Firebase's free Spark plan, and there's no billing to set up.
 
-> A one-click setup and a Galleyleaf phone app are on the way. Until then, follow the steps below. They take about 20 minutes, and you don't need to install anything on your computer.
+Setup takes about 10 minutes in your browser, and you don't need to install anything. A Galleyleaf phone app for readers is on the way.
 
 ## What you need
 
@@ -19,88 +19,38 @@ Galleyleaf is a small website that you deploy into your own free Firebase projec
 
 ## Set up your book site
 
-All the steps run in **Google Cloud Shell**, a free terminal in your browser with the tools already installed.
+[![Open in Cloud Shell](https://www.gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/galleyleaf/galleyleaf&cloudshell_workspace=.)
 
-### 1. Open Cloud Shell with this project
+1. **Click "Open in Cloud Shell"** above and sign in with your Google account.
+   - **Cloud Shell** is Google's free terminal in the browser.
+   - If it asks whether to trust the repository, confirm. Galleyleaf's files open automatically.
+2. **In the terminal at the bottom, run:**
 
-Go to [shell.cloud.google.com](https://shell.cloud.google.com/) and sign in with your Google account. Then paste this into the terminal and press Enter:
+   ```bash
+   ./setup.sh
+   ```
 
-```bash
-git clone https://github.com/galleyleaf/galleyleaf.git && cd galleyleaf
-```
+3. **Answer a few questions:**
+   - **Your book's title.**
+   - **Your admin email.** Use the Google account you'll manage the book with; the suggestion is the account you're signed in with.
+   - **A project id.** It becomes your site address, for example `my-novel-draft.web.app`, and can't be changed later. The suggestion is based on your title.
+   - **A region** for your data, near your readers.
 
-### 2. Sign in to Firebase
-
-```bash
-npx -y firebase-tools@latest login --no-localhost
-```
-
-Follow the link it shows, approve the access, and paste the code back into the terminal.
-
-### 3. Create your Firebase project
-
-Pick a project id: 6–30 lowercase letters, numbers and dashes, for example `my-novel-draft`. It becomes part of your site address (`my-novel-draft.web.app`) and can't be changed later.
-
-```bash
-PROJECT=my-novel-draft
-npx -y firebase-tools@latest projects:create $PROJECT --display-name "My Novel"
-npx -y firebase-tools@latest use $PROJECT
-```
-
-If this fails with a message about terms of service, open [console.firebase.google.com](https://console.firebase.google.com/), accept the terms once, and run it again.
-
-### 4. Create the database
-
-Choose a location close to your readers, for example `us-central1`, `europe-west1` or `southamerica-east1`. The full list is shown by `npx -y firebase-tools@latest firestore:locations`.
-
-```bash
-npx -y firebase-tools@latest firestore:databases:create "(default)" --location=us-central1
-```
-
-### 5. Connect the website to your project
-
-```bash
-npx -y firebase-tools@latest apps:create WEB "Book site"
-npx -y firebase-tools@latest apps:sdkconfig WEB
-```
-
-The second command prints a block of settings (`apiKey`, `authDomain`, `projectId` and so on). Open `js/firebase-config.js` in the Cloud Shell editor (the **Open Editor** button) and replace each `REPLACE_ME` value with the matching one.
-
-These values aren't secret. Every Firebase website shares them, and the security rules are what protect your book.
-
-### 6. Set your book title and email
-
-In `firebase.json`, replace:
-- `REPLACE_WITH_BOOK_TITLE`: shown to readers on the Google sign-in screen.
-- `REPLACE_WITH_YOUR_EMAIL`: the support email on that screen. It must be the Google account you're using.
-
-### 7. Deploy
-
-```bash
-npx -y firebase-tools@latest deploy --only auth,firestore:rules,hosting
-```
-
-When it finishes, it prints your site address, for example `https://my-novel-draft.web.app`.
-
-### 8. Make yourself the admin
-
-1. Open your site and sign in with Google.
-2. In the [Firebase console](https://console.firebase.google.com/), open your project, then **Firestore Database**.
-3. Open the `users` collection and the document with your email. Make sure both fields are set:
-   - `admin`: `true`
-   - `approved`: `true`
-
-### 9. Publish your book
-
-Open `https://<your-project>.web.app/admin/upload.html`. Choose your manuscript file, check the chapter preview, and click **Publish to readers**. Do this again whenever you revise the book.
-
-### 10. Share it
-
-Send your readers the site address. Anyone who signs in with Google can read, unless you remove them.
+   The script signs you in to Firebase (follow the link it shows and paste the code back), creates your project and database, and deploys your site.
+4. **Open your site and sign in** with your admin email. You're the admin automatically.
+5. **Publish your book** at `https://<your-project>.web.app/admin/upload.html`. Choose your manuscript file, check the chapter preview, and click **Publish to readers**. Do this again whenever you revise the book.
+6. **Share the site address** with your readers. Anyone who signs in with Google can read, unless you remove them.
 
 From `https://<your-project>.web.app/admin/` you can:
 - see who has signed in, and remove or restore anyone's access
 - read every comment, filtered by chapter or reader, and delete spam
+
+**If something goes wrong:**
+- **Setup stops with an error.** Read the message: it says what to do. Then run `./setup.sh` again; it skips what's already done.
+- **It mentions terms of service.** Open [console.firebase.google.com](https://console.firebase.google.com/) once, accept the terms, and run `./setup.sh` again.
+- **You want to see what would happen first.** Run `./setup.sh --dry-run`. It only shows the steps.
+- **You want to change your answers.** Run `./setup.sh --reconfigure`.
+- **You signed in to your site before running setup.** Your account was created without admin rights. In the [Firebase console](https://console.firebase.google.com/), open **Firestore Database** › `users`, find your email and set `admin` to `true`.
 
 ## Preparing your manuscript
 
@@ -140,14 +90,13 @@ A line with only three dashes marks a scene break.
 
 ## Updating to a new version
 
-From Cloud Shell, in the `galleyleaf` folder:
+Open [Cloud Shell](https://shell.cloud.google.com/), go to the Galleyleaf folder (`cd ~/cloudshell_open/galleyleaf` if you used the button) and run:
 
 ```bash
-git stash && git pull && git stash pop
-npx -y firebase-tools@latest deploy --only firestore:rules,hosting
+git pull && ./setup.sh
 ```
 
-`git stash` keeps your edits to `js/firebase-config.js` and `firebase.json` while the new version is downloaded. A simpler update command is planned.
+Your answers are saved in `book.config.json`, so it just redeploys. Your own settings live in files that `git pull` never touches.
 
 ## Costs and limits
 

@@ -15,6 +15,18 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { auth, db, googleProvider } from "./firebase.js";
 
+// The site owner's email, written to /site.json by setup.sh. The owner's
+// profile is created as admin; the security rules check the same address.
+async function siteOwnerEmail() {
+  try {
+    const res = await fetch("/site.json");
+    if (res.ok) return String((await res.json()).ownerEmail || "").toLowerCase();
+  } catch {
+    /* no site.json: nobody is bootstrapped as admin */
+  }
+  return "";
+}
+
 // The security rules only accept Google-hosted profile photos (or none).
 const GOOGLE_PHOTO = /^https:\/\/lh3\.googleusercontent\.com\//;
 
@@ -67,14 +79,14 @@ export function watchAccess(callback) {
           // snapshot fires again once the document exists.
           if (creating) return;
           creating = true;
-          setDoc(ref, {
+          siteOwnerEmail().then((owner) => setDoc(ref, {
             displayName: (user.displayName || "").slice(0, 100),
             email: user.email || "",
             photoURL: GOOGLE_PHOTO.test(user.photoURL || "") && user.photoURL.length <= 500 ? user.photoURL : "",
             approved: true,
-            admin: false,
+            admin: !!owner && (user.email || "").toLowerCase() === owner,
             createdAt: serverTimestamp(),
-          }).catch((error) => callback({ state: "error", user, error }));
+          })).catch((error) => callback({ state: "error", user, error }));
           return;
         }
         const profile = snap.data();

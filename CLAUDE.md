@@ -34,7 +34,7 @@ This is the public template. Each author deploys their own copy into their own F
 - **An author's manuscript (`book.md`) is never deployed or committed here.** Readers get the text from Firestore, where security rules protect it.
 - **Run the UI tests after changes and before deploying** (see Testing).
 - **It must run on Firebase's free Spark plan.** Authors deploy into their own accounts at no cost. Don't add anything that needs Blaze (Cloud Functions included) or another paid cloud service.
-- **No personal or project-specific data in this repo.** No real Firebase config, emails or manuscripts. `js/firebase-config.js` and `firebase.json` keep their `REPLACE_ME` placeholders.
+- **No personal or project-specific data in this repo.** No real Firebase config, emails or manuscripts. `js/firebase-config.js` and `firebase.json` keep their `REPLACE_ME` placeholders, and `firestore.rules` keeps `__OWNER_EMAIL__`.
 
 ## Product decisions
 
@@ -42,7 +42,7 @@ This is the public template. Each author deploys their own copy into their own F
   - **Removing access:** an admin removes it from `/admin/` ("Remove access"), or by setting `approved: false` in the console.
   - **What a removed reader sees:** an "access paused" screen.
   - **Restoring access:** "Approve" turns it back on, and the screen switches to the library live, with no reload.
-- **Admins:** `admin: true` is set only in the Firebase console. Admins can:
+- **Admins:** the site owner (the email given to `setup.sh`) becomes admin on first sign-in. The rules allow `admin: true` on create only for that verified Google address (`isSiteOwner()`), and `js/auth.js` reads it from `/site.json`. Other admins are set in the Firebase console. Admins can:
   - read all profiles
   - change only the `approved` flag
   - read every reader's comments, and delete any of them (spam cleanup)
@@ -83,7 +83,28 @@ This is the public template. Each author deploys their own copy into their own F
 - A blank line separates paragraphs. A `---` line marks a scene break. `_x_` or `*x*` makes italics, and `**x**` makes bold.
 - After editing the book, republish it from `/admin/upload.html`.
 
-## Commands
+## Setup and deploy
+
+Authors run `./setup.sh` (made for Google Cloud Shell; see `README.md`). It:
+1. signs in to Firebase
+2. asks for the title, admin email, project id and region, and saves the answers to `book.config.json`
+3. creates the project, the `(default)` Standard database and a web app, skipping whatever already exists
+4. generates its own settings files, all git-ignored, so `git pull` never conflicts:
+
+   | File | What it holds | Deployed? |
+   |---|---|---|
+   | `site.json` | `{ownerEmail}` | Yes, read by `js/auth.js` |
+   | `firestore.deploy.rules` | `firestore.rules` with `__OWNER_EMAIL__` filled in | Deployed as the rules |
+   | `firebase.deploy.json` | `firebase.json` with the title, support email and the generated rules path | No, it's the deploy config |
+
+5. deploys auth, rules and hosting with `--config firebase.deploy.json`
+
+**Other runs:**
+- **Running it again redeploys with the saved answers.** Updating is `git pull && ./setup.sh`.
+- **`--dry-run`** shows the steps without changing anything.
+- **`--reconfigure`** asks the questions again.
+
+**The deployed site needs no config file.** `js/firebase.js` reads the web config from Firebase Hosting's reserved `/__/firebase/init.json`. `js/firebase-config.js` is only a fallback for local previews.
 
 ```bash
 # Local preview (localhost is an authorized sign-in domain)
@@ -92,13 +113,18 @@ python3 -m http.server 8000
 # UI tests
 tests/run-ui-tests.sh
 
-# Deploy
-npx -y firebase-tools@latest deploy --only firestore:rules --dry-run   # check rules compile
-npx -y firebase-tools@latest deploy --only firestore:rules,hosting
-npx -y firebase-tools@latest deploy --only auth                        # Google sign-in settings
+# Check that the rules compile (any project you can access)
+npx -y firebase-tools@latest deploy --only firestore:rules --dry-run --project <id>
 ```
 
-Hosting serves the project root and ignores `firebase.json`, `firestore.rules`, `book.md`, `CLAUDE.md`, `tests/**`, `docs/**` and dotfiles. Check that list when you add files that shouldn't go live.
+Hosting serves the project root and ignores:
+- the deploy settings: `firebase.json`, `firebase.deploy.json`, `firestore.rules` and `firestore.deploy.rules`
+- `setup.sh` and `book.config.json`
+- `book.md`
+- the docs: `CLAUDE.md`, `README.md` and `LICENSE`
+- `tests/**`, `docs/**` and dotfiles
+
+`site.json` is deployed on purpose. Check this list when you add files that shouldn't go live.
 
 ## Testing
 
@@ -127,7 +153,8 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 | `js/storage.js` | `localStorage` progress, bookmarks and preferences |
 | `js/celebrate.js` | Confetti animation |
 | `js/md-parser.js` | Turns `book.md` into sections and paragraphs (used by the upload page and the test mock) |
-| `js/firebase.js`, `js/firebase-config.js` | Firebase init and web app config |
+| `js/firebase.js`, `js/firebase-config.js` | Firebase init (config from Hosting's `init.json`; the file is a local-preview fallback) |
+| `setup.sh` | Creates, configures and deploys an author's project (see Setup and deploy) |
 | `admin/index.html`, `admin/admin.js` | Readers (remove or restore access) and all comments |
 | `admin/upload.html`, `admin/upload.js` | Publishes `book.md` to Firestore |
 | `css/admin.css` | Styles shared by the admin pages |
@@ -145,8 +172,9 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 
 ## Roadmap
 
-- **A guided setup:** an "Open in Cloud Shell" button and a `setup.sh` script will create and configure an author's Firebase project in one step.
-  - The author will become admin automatically.
-  - Until then, authors follow the manual steps in `README.md`.
+- **"Open in Cloud Shell" button and `setup.sh`: done.**
+- **Still to come for setup:**
+  - a Cloud Shell side-panel tutorial
+  - an admin-page banner when a newer version is available
 - **The Galleyleaf mobile app:** it will let readers open approved books from their phone.
-  - Each book's site will gain a `reader.json`, an app sign-in page, and an "Available in the app" switch on the admin page.
+  - Each book's site will gain a `reader.json`, an app sign-in page, email-link sign-in, and an "Available in the app" switch on the admin page.
