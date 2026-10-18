@@ -10,7 +10,7 @@ Galleyleaf is a small website that you deploy into your own free Firebase projec
 - **Discourages casual copying.** Text can't be selected, copied or printed from the reader.
 - **Free to run.** Everything fits in Firebase's free Spark plan, and there's no billing to set up.
 
-Setup takes about 10 minutes in your browser, and you don't need to install anything. A Galleyleaf phone app for readers is on the way.
+Setup takes about 10 minutes in your browser: create a project on the Firebase website, then run one command. You don't need to install anything. A Galleyleaf phone app for readers is on the way.
 
 ## What you need
 
@@ -19,9 +19,21 @@ Setup takes about 10 minutes in your browser, and you don't need to install anyt
 
 ## Set up your book site
 
+### 1. Create your Firebase project
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com/) and sign in with the Google account you'll manage the book with.
+2. Click **Create a project** and give it a name, for example your book's title.
+   - **The project id** is shown under the name. It becomes your site address (`<id>.web.app`) and can't be changed later. Click it to edit it if you like.
+3. **Accept the Firebase terms** when asked.
+4. **Turn off Google Analytics** when asked. Galleyleaf doesn't use it.
+5. Click **Create project** and wait until it's ready.
+   - It's created on the free Spark plan, and you don't need to upgrade.
+
+### 2. Run the setup
+
 [![Open in Cloud Shell](https://www.gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/galleyleaf/galleyleaf&cloudshell_workspace=.)
 
-1. **Click "Open in Cloud Shell"** above and sign in with your Google account.
+1. **Click "Open in Cloud Shell"** above and sign in with the same Google account.
    - **Cloud Shell** is Google's free terminal in the browser.
    - If it asks whether to trust the repository, confirm. Galleyleaf's files open automatically.
 2. **In the terminal at the bottom, run:**
@@ -30,16 +42,20 @@ Setup takes about 10 minutes in your browser, and you don't need to install anyt
    ./setup.sh
    ```
 
-3. **Answer a few questions:**
+3. **Sign in to Firebase** when it asks: open the link it shows, approve the access, and paste the code back into the terminal.
+4. **Answer a few questions:**
    - **Your book's title.**
-   - **Your admin email.** Use the Google account you'll manage the book with; the suggestion is the account you're signed in with.
-   - **A project id.** It becomes your site address, for example `my-novel-draft.web.app`, and can't be changed later. The suggestion is based on your title.
+   - **Your admin email.** The suggestion is the account you're signed in with.
+   - **Your project.** Pick the project you created in step 1 from the list. A brand-new project can take a minute to appear; you can also type its id.
    - **A region** for your data, near your readers.
 
-   The script signs you in to Firebase (follow the link it shows and paste the code back), creates your project and database, and deploys your site.
-4. **Open your site and sign in** with your admin email. You're the admin automatically.
-5. **Publish your book** at `https://<your-project>.web.app/admin/upload.html`. Choose your manuscript file, check the chapter preview, and click **Publish to readers**. Do this again whenever you revise the book.
-6. **Share the site address** with your readers. Anyone who signs in with Google can read, unless you remove them.
+   The script then creates your database and deploys your site.
+
+### 3. Start sharing
+
+1. **Open your site and sign in** with your admin email. You're the admin automatically.
+2. **Publish your book** at `https://<your-project>.web.app/admin/upload.html`. Choose your manuscript file, check the chapter preview, and click **Publish to readers**. Do this again whenever you revise the book.
+3. **Share the site address** with your readers. Anyone who signs in with Google can read, unless you remove them.
 
 From `https://<your-project>.web.app/admin/` you can:
 - see who has signed in, and remove or restore anyone's access
@@ -47,12 +63,9 @@ From `https://<your-project>.web.app/admin/` you can:
 
 **If something goes wrong:**
 - **Setup stops with an error.** Read the message: it says what to do. Then run `./setup.sh` again; it skips what's already done.
-- **"Firebase couldn't be set up" or "caller does not have permission".** Your Google account probably hasn't accepted Firebase's terms yet. To fix it:
-  1. Open [console.firebase.google.com](https://console.firebase.google.com/) with the same account.
-  2. Click **Create a project** and accept the terms on the first screen. You can close it after that.
-  3. Run `./setup.sh` again. It continues with the same project.
+- **"Can't open the Firebase project".** Make sure you created it in the console with the same Google account you signed in to Cloud Shell with, and that the id is right. A brand-new project can take a minute.
 - **You want to see what would happen first.** Run `./setup.sh --dry-run`. It only shows the steps.
-- **You want to change your answers.** Run `./setup.sh --reconfigure`.
+- **You want to change your answers or pick another project.** Run `./setup.sh --reconfigure`.
 - **You signed in to your site before running setup.** Your account was created without admin rights. In the [Firebase console](https://console.firebase.google.com/), open **Firestore Database** › `users`, find your email and set `admin` to `true`.
 
 ## Preparing your manuscript

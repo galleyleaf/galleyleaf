@@ -87,8 +87,8 @@ This is the public template. Each author deploys their own copy into their own F
 
 Authors run `./setup.sh` (made for Google Cloud Shell; see `README.md`). It:
 1. signs in to Firebase
-2. asks for the title, admin email, project id and region, and saves the answers to `book.config.json`
-3. creates the project, the `(default)` Standard database and a web app, skipping whatever already exists
+2. asks for the title, admin email, project and region, and saves the answers to `book.config.json` right away
+3. uses a project the author created in the Firebase console, chosen from `projects:list`. Creating it there is how the author accepts Firebase's terms; `projects:create` from the CLI fails with a 403 for accounts that haven't. It then creates the `(default)` Standard database and a web app, skipping whatever already exists.
 4. generates its own settings files, all git-ignored, so `git pull` never conflicts:
 
    | File | What it holds | Deployed? |

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Galleyleaf setup: creates and configures your Firebase project, then deploys
-# your book site. Made for Google Cloud Shell; it also works on any computer
-# with Node.js.
+# Galleyleaf setup: configures your Firebase project and deploys your book site.
+# Create the project first at https://console.firebase.google.com (that's also
+# where you accept Firebase's terms). Made for Google Cloud Shell; it also works
+# on any computer with Node.js.
 #
 #   ./setup.sh               first run: asks a few questions, then sets everything up
 #   ./setup.sh               later runs: redeploys with your saved settings (use after updating)
@@ -24,7 +25,7 @@ for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --reconfigure) RECONFIGURE=1 ;;
-    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (try --help)"; exit 1 ;;
   esac
 done
@@ -119,16 +120,30 @@ else
     info "That doesn't look like an email address."
   done
 
-  slug=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g' | cut -c1-20 | sed -E 's/-+$//')
-  [ ${#slug} -ge 3 ] || slug="my-book"
-  suggestion="$slug-$(printf '%04x' $((RANDOM % 65536)))"
   echo
-  info "Your project id becomes your site address (<id>.web.app) and can't be changed."
-  info "Use 6-30 lowercase letters, numbers and dashes. Ids are global, so common ones are taken."
+  info "Which Firebase project is this book for?"
+  info "Create it first at https://console.firebase.google.com if you haven't (see README.md)."
+  projects=$("${FB[@]}" projects:list --json 2>/dev/null \
+    | json '(j.result || []).map((p) => p.projectId + "  " + (p.displayName || "")).join("\n")' || true)
+  default_project=""
+  if [ -n "$projects" ]; then
+    echo
+    printf '%s\n' "$projects" | nl -w4 -s'. '
+    echo
+    [ "$(printf '%s\n' "$projects" | wc -l)" -eq 1 ] && default_project=1
+    info "A project you just created can take a minute to appear. You can also type its id."
+  else
+    info "No projects found yet for $account. A new project can take a minute to appear; you can type its id."
+  fi
   while :; do
-    ask project "Project id" "$suggestion"
+    ask choice "Project number or id" "$default_project"
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ -n "$projects" ]; then
+      project=$(printf '%s\n' "$projects" | sed -n "${choice}p" | awk '{print $1}')
+    else
+      project=$choice
+    fi
     [[ "$project" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] && break
-    info "Use 6-30 characters: start with a letter, then lowercase letters, numbers or dashes."
+    info "Enter a number from the list, or a project id like my-novel-draft."
   done
 
   echo
@@ -150,29 +165,13 @@ fi
 # ---------- 3. Firebase project ----------
 
 step "Firebase project"
-if "${FB[@]}" apps:list WEB --project "$project" --json >/dev/null 2>&1; then
-  ok "Using existing project $project"
-else
-  display=$(printf '%s' "$title" | sed -E "s/[^A-Za-z0-9 !'-]//g" | cut -c1-30)
-  [ ${#display} -ge 4 ] || display="Galleyleaf book"
-  info "Creating project $project (this takes a minute)..."
-  if run "${FB[@]}" projects:create "$project" --display-name "$display" --non-interactive; then
-    ok "Created project $project"
-  else
-    # projects:create makes the Google Cloud project first, then adds Firebase to
-    # it. If the second part failed (or this is a rerun), only Firebase is missing.
-    info "Adding Firebase to the Google Cloud project $project..."
-    run "${FB[@]}" projects:addfirebase "$project" || fail "Firebase couldn't be set up for $project." \
-      "Most likely, $account hasn't accepted Firebase's terms of service yet:" \
-      "  1. Open https://console.firebase.google.com signed in as $account." \
-      "  2. Click \"Create a project\" (or \"Add project\") and accept the Firebase terms on the first screen." \
-      "     You can close it after that; you don't need to finish creating a project there." \
-      "  3. Run ./setup.sh again. It continues with the same project." \
-      "If that doesn't help, the id may belong to someone else: run ./setup.sh --reconfigure and choose another." \
-      "Google also limits how many projects one account can create: https://console.cloud.google.com/cloud-resource-manager"
-    ok "Firebase added to $project"
-  fi
-fi
+"${FB[@]}" apps:list WEB --project "$project" --json >/dev/null 2>&1 \
+  || fail "Can't open the Firebase project \"$project\" as $account." \
+    "- Create it at https://console.firebase.google.com with this same Google account." \
+    "- Check the id: it's shown under the project name in the console (Project settings)." \
+    "- If you just created it, wait a minute and run ./setup.sh again." \
+    "- To choose a different project, run ./setup.sh --reconfigure"
+ok "Using project $project"
 
 # ---------- 4. Database ----------
 
