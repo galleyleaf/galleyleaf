@@ -114,11 +114,8 @@ async (page) => {
     /* ---------- Scroll view ---------- */
     await page.goto(`${BASE}/#/read/chapter-2/5`);
     await wait(600);
-    await page.locator("#btn-account").click();
-    check("The account menu sits in the reader's top bar", await evalPage(() => !!document.querySelector("#reader-account-slot #account-menu:not([hidden])")));
     await page.locator("#btn-view-mode").click();
     await wait(500);
-    check("Switching the view closes the account menu", await evalPage(() => document.getElementById("account-menu").hidden));
     const activeIndex = () => evalPage(() => Number(document.querySelector(".flow-p.is-active")?.dataset.index));
     check("Switching to scroll view keeps the same paragraph", (await activeIndex()) === 4, String(await activeIndex()));
     check("Scroll view shows the whole chapter", (await page.locator(".flow-p").count()) > 1);
@@ -166,8 +163,21 @@ async (page) => {
     await page.locator("#btn-close-comments").click();
     await evalPage(() => localStorage.removeItem("mock:quotaUsed"));
 
+    /* ---------- Account menu ---------- */
+    await open("");
+    await page.locator("#btn-account").click();
+    const menuLinks = async () => (await page.locator("#account-menu a:visible").allTextContents()).map((t) => t.trim());
+    const libraryLinks = await menuLinks();
+    check("The account menu links to every page for an admin", libraryLinks.join("|") === "Library|Readers and comments|Publish the book", libraryLinks.join("|"));
+    await page.locator("#account-menu").getByRole("link", { name: "Readers and comments" }).click();
+    await wait(900);
+    check("The account menu opens the admin page", await visible("#content"));
+
     /* ---------- Admin ---------- */
     await open("admin/");
+    await page.locator("#btn-account").click();
+    check("The admin page has the same account menu", (await menuLinks()).length === 3 && (await text('#account-menu [aria-current="page"]')).trim() === "Readers and comments");
+    await page.keyboard.press("Escape");
     check("Admin page lists readers with access removed", (await page.locator("#pending-list li").count()) === 1);
     check("Admin page lists comments", (await page.locator("#comment-list li").count()) >= 1);
     const before = await page.locator("#comment-list li").count();

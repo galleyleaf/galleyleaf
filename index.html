@@ -18,6 +18,7 @@
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js">
   <link rel="modulepreload" href="js/app.js">
   <link rel="modulepreload" href="js/auth.js">
+  <link rel="modulepreload" href="js/account-menu.js">
   <link rel="modulepreload" href="js/book.js">
   <link rel="modulepreload" href="js/reader.js">
   <link rel="modulepreload" href="js/comments.js">
@@ -96,34 +97,25 @@
         <svg aria-hidden="true"><use href="#i-star"/></svg>
         <span data-book-title>Book Reader</span>
       </span>
-      <div class="topbar-actions" id="library-account-slot">
+      <div class="topbar-actions">
+        <button type="button" class="icon-btn" data-action="toggle-theme" aria-label="Switch to dark theme">
+          <svg class="when-light" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="when-dark" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
         <div class="account" id="account">
-          <button type="button" class="avatar-btn" id="btn-account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu" aria-label="Account and settings">
+          <button type="button" class="avatar-btn" id="btn-account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu" aria-label="Account">
             <img id="avatar-img" alt="" referrerpolicy="no-referrer" hidden>
             <span id="avatar-initial" aria-hidden="true"></span>
           </button>
           <div class="account-menu" id="account-menu" hidden>
             <p class="account-name" id="account-name"></p>
             <p class="account-email" id="account-email"></p>
-            <button type="button" class="menu-link" id="btn-view-mode">
-              <svg class="when-paragraph-mode" aria-hidden="true"><use href="#i-view-scroll"/></svg>
-              <svg class="when-scroll-mode" aria-hidden="true"><use href="#i-view-paragraph"/></svg>
-              <span class="when-paragraph-mode">Scrolling view</span>
-              <span class="when-scroll-mode">One paragraph at a time</span>
-            </button>
-            <button type="button" class="menu-link" id="btn-text-size">
-              <svg aria-hidden="true"><use href="#i-text"/></svg>
-              <span>Text size</span>
-              <span class="menu-value" id="text-size-value"></span>
-            </button>
-            <button type="button" class="menu-link" data-action="toggle-theme">
-              <svg class="when-light" aria-hidden="true"><use href="#i-moon"/></svg>
-              <svg class="when-dark" aria-hidden="true"><use href="#i-sun"/></svg>
-              <span class="when-light">Dark theme</span>
-              <span class="when-dark">Light theme</span>
-            </button>
-            <a class="menu-link" href="admin/" id="admin-link" hidden>Readers and comments</a>
-            <button type="button" class="menu-link" data-action="sign-out">Sign out</button>
+            <nav class="menu-nav" aria-label="Pages">
+              <a class="menu-link" href="#/" aria-current="page">Library</a>
+              <a class="menu-link" href="admin/" data-admin-only hidden>Readers and comments</a>
+              <a class="menu-link" href="admin/upload.html" data-admin-only hidden>Publish the book</a>
+            </nav>
+            <button type="button" class="menu-link" id="btn-sign-out">Sign out</button>
           </div>
         </div>
       </div>
@@ -165,7 +157,19 @@
         <svg aria-hidden="true"><use href="#i-back"/></svg>
       </a>
       <h1 class="reader-chapter" id="reader-chapter"></h1>
-      <div class="reader-tools" id="reader-account-slot"></div>
+      <div class="reader-tools">
+        <button type="button" class="icon-btn" id="btn-view-mode" aria-label="Switch to scrolling view">
+          <svg class="when-paragraph-mode" aria-hidden="true"><use href="#i-view-scroll"/></svg>
+          <svg class="when-scroll-mode" aria-hidden="true"><use href="#i-view-paragraph"/></svg>
+        </button>
+        <button type="button" class="icon-btn" id="btn-text-size" aria-label="Change text size">
+          <svg aria-hidden="true"><use href="#i-text"/></svg>
+        </button>
+        <button type="button" class="icon-btn" data-action="toggle-theme" aria-label="Switch to dark theme">
+          <svg class="when-light" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="when-dark" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+      </div>
     </header>
 
     <div class="reader-progress">

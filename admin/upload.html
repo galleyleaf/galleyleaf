@@ -14,12 +14,25 @@
 </head>
 <body>
   <main class="admin">
-    <nav class="admin-nav" aria-label="Admin">
-      <a href="../">Library</a>
-      <a href="./">Readers and comments</a>
-      <a href="upload.html" aria-current="page">Publish the book</a>
-    </nav>
-    <h1>Publish the book</h1>
+    <header class="admin-head">
+      <h1>Publish the book</h1>
+      <div class="account" id="account" hidden>
+        <button type="button" class="avatar-btn" id="btn-account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu" aria-label="Account">
+          <img id="avatar-img" alt="" referrerpolicy="no-referrer" hidden>
+          <span id="avatar-initial" aria-hidden="true"></span>
+        </button>
+        <div class="account-menu" id="account-menu" hidden>
+          <p class="account-name" id="account-name"></p>
+          <p class="account-email" id="account-email"></p>
+          <nav class="menu-nav" aria-label="Pages">
+            <a class="menu-link" href="../">Library</a>
+            <a class="menu-link" href="./" data-admin-only hidden>Readers and comments</a>
+            <a class="menu-link" href="upload.html" aria-current="page" data-admin-only hidden>Publish the book</a>
+          </nav>
+          <button type="button" class="menu-link" id="btn-sign-out">Sign out</button>
+        </div>
+      </div>
+    </header>
     <p>Choose the book’s Word (.docx) or Markdown file. It’s split into chapters and paragraphs in your browser, then saved to Firestore, where only approved readers can open it. Publishing again replaces the current text. Readers’ comments are tied to paragraph numbers, so they may point to different paragraphs if you add or remove paragraphs.</p>
 
     <p class="status" id="status">Checking your account…</p>

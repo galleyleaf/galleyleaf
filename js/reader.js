@@ -349,6 +349,10 @@ function setMode(mode) {
   el.view.dataset.mode = state.mode;
   el.passage.hidden = state.mode !== "paragraph";
   el.flow.hidden = state.mode !== "scroll";
+  el.modeBtn.setAttribute(
+    "aria-label",
+    state.mode === "scroll" ? "Switch to one paragraph at a time" : "Switch to scrolling view"
+  );
 }
 
 setMode(getPref("readMode", "paragraph"));

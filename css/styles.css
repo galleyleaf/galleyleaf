@@ -345,11 +345,15 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
   cursor: pointer;
 }
 .menu-link:hover { color: var(--gold); }
-.menu-link svg { width: 20px; height: 20px; margin-right: 0.75rem; flex: none; }
-.menu-value { margin-left: auto; color: var(--muted); font-size: 0.875rem; }
-.menu-link:hover .menu-value { color: inherit; }
-/* The view switch only applies while reading. */
-body:not([data-view="reader"]) #btn-view-mode { display: none; }
+.menu-link[aria-current="page"] { font-weight: 600; }
+.menu-link[aria-current="page"]::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--gold);
+}
 
 .library {
   width: 100%;
@@ -504,8 +508,6 @@ body:not([data-view="reader"]) #btn-view-mode { display: none; }
 }
 
 .reader-top {
-  position: relative;
-  z-index: 5;
   display: flex;
   align-items: center;
   gap: 0.25rem;

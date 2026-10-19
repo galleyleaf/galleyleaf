@@ -9,6 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { auth, db } from "../js/firebase.js";
 import { ensureProfile, signIn, whenRulesReady } from "../js/auth.js";
+import { renderAccount } from "../js/account-menu.js";
 import { parseBook } from "../js/md-parser.js";
 import { parseDocx } from "../js/docx-parser.js";
 
@@ -23,6 +24,7 @@ function status(message, isError = false) {
 
 onAuthStateChanged(auth, async (user) => {
   $("tools").hidden = true;
+  renderAccount(user, null);
   if (!user) {
     status("Sign in with the admin account to publish.");
     const btn = document.createElement("button");
@@ -36,6 +38,7 @@ onAuthStateChanged(auth, async (user) => {
   try {
     const profile = await whenRulesReady(() => ensureProfile(user), () =>
       status("Your site is getting ready. Right after setup this can take a few minutes. This page opens by itself."));
+    renderAccount(user, profile);
     if (profile.admin !== true) {
       status(`${user.email} isn’t an admin. Sign in with the admin email you gave during setup, or in the Firestore console set admin: true and approved: true on users/${user.uid}, then reload this page.`, true);
       return;

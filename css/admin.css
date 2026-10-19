@@ -1,13 +1,11 @@
 /* Admin pages (approvals, comments, publishing). Builds on styles.css tokens. */
 
-.admin { max-width: 48rem; margin: 0 auto; padding: calc(var(--safe-top) + 1.5rem) var(--gutter) 4rem; display: grid; gap: 1.5rem; }
+.admin { max-width: 48rem; margin: 0 auto; padding: calc(var(--safe-top) + 1.5rem) var(--gutter) 4rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
 .admin h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(2.25rem, 9vw, 3rem); line-height: 1.05; }
 .admin > p { color: var(--muted); }
 
-.admin-nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
-.admin-nav a { font-size: 0.9375rem; font-weight: 500; color: var(--muted); text-decoration: none; padding: 0.5rem 0; }
-.admin-nav a:hover { color: var(--ink); text-decoration: underline; }
-.admin-nav a[aria-current="page"] { color: var(--ink); }
+.admin-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.admin-head .account { margin: -4px -6px 0 0; }
 
 .admin-section { display: grid; gap: 0.75rem; }
 .admin-section h2 {
@@ -108,7 +106,7 @@
 
 /* Publish page */
 .file-drop { display: grid; gap: 0.5rem; padding: 1.25rem; border: 1px dashed var(--line); border-radius: 14px; background: var(--surface); }
-.file-drop input { font: inherit; max-width: 100%; }
+.file-drop input { font: inherit; min-width: 0; max-width: 100%; }
 .hint { margin-top: 0.75rem; font-size: 0.875rem; color: var(--muted); }
 .hint code { font-size: 0.95em; padding: 0 0.25em; border-radius: 4px; background: var(--line); color: var(--ink); }
 .summary { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }

@@ -1,5 +1,6 @@
 // App shell: access gate, routing, library screen, theme and text size.
 import { signIn, signOut, watchAccess } from "./auth.js";
+import { renderAccount } from "./account-menu.js";
 import { clearBookCache, loadMeta } from "./book.js";
 import { closeReader, initReader, openChapter } from "./reader.js";
 import {
@@ -24,13 +25,6 @@ let access = { state: "loading" };
 function show(view) {
   for (const name of VIEWS) $(`view-${name}`).hidden = name !== view;
   document.body.dataset.view = view;
-  // One account menu serves both top bars; it moves to the one on screen.
-  const slot = $(view === "reader" ? "reader-account-slot" : "library-account-slot");
-  if (slot && !slot.contains($("account"))) {
-    $("account-menu").hidden = true;
-    $("btn-account").setAttribute("aria-expanded", "false");
-    slot.append($("account"));
-  }
 }
 
 let toastTimer = 0;
@@ -60,16 +54,15 @@ function effectiveTheme() {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-const TEXT_SIZE_NAMES = ["Small", "Medium", "Large", "Extra large"];
-
 function applyTheme(theme) {
   if (theme) document.documentElement.dataset.theme = theme;
   else delete document.documentElement.dataset.theme;
+  const label = effectiveTheme() === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  document.querySelectorAll('[data-action="toggle-theme"]').forEach((b) => b.setAttribute("aria-label", label));
 }
 
 function applyTextSize(size) {
   document.documentElement.dataset.size = String(size);
-  $("text-size-value").textContent = TEXT_SIZE_NAMES[size];
 }
 
 applyTheme(getPref("theme", null));
@@ -81,6 +74,7 @@ $("btn-text-size").addEventListener("click", () => {
   const size = (getPref("textSize", 1) + 1) % TEXT_SIZES;
   setPref("textSize", size);
   applyTextSize(size);
+  toast(["Small text", "Medium text", "Large text", "Extra large text"][size]);
 });
 
 /* ---------- Global actions ---------- */
@@ -88,7 +82,6 @@ $("btn-text-size").addEventListener("click", () => {
 document.addEventListener("click", (e) => {
   const action = e.target.closest("[data-action]")?.dataset.action;
   if (action === "sign-out") {
-    closeAccountMenu();
     signOut();
   } else if (action === "toggle-theme") {
     const theme = effectiveTheme() === "dark" ? "light" : "dark";
@@ -116,50 +109,6 @@ $("btn-retry").addEventListener("click", () => {
   if (access.state === "approved") route();
   else location.reload();
 });
-
-/* ---------- Account menu ---------- */
-
-const accountBtn = $("btn-account");
-const accountMenu = $("account-menu");
-
-function closeAccountMenu() {
-  accountMenu.hidden = true;
-  accountBtn.setAttribute("aria-expanded", "false");
-}
-
-accountBtn.addEventListener("click", (e) => {
-  e.stopPropagation();
-  const open = accountMenu.hidden;
-  accountMenu.hidden = !open;
-  accountBtn.setAttribute("aria-expanded", String(open));
-});
-// Switching the view closes the menu so the reader sees the chapter reflow.
-$("btn-view-mode").addEventListener("click", closeAccountMenu);
-document.addEventListener("click", (e) => {
-  if (!accountMenu.hidden && !e.target.closest(".account")) closeAccountMenu();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !accountMenu.hidden) {
-    closeAccountMenu();
-    accountBtn.focus();
-  }
-});
-
-function renderAccount(user, profile) {
-  const name = user.displayName || user.email || "Reader";
-  $("account-name").textContent = name;
-  $("account-email").textContent = user.email || "";
-  $("avatar-initial").textContent = name.trim().charAt(0).toUpperCase();
-  const img = $("avatar-img");
-  if (user.photoURL) {
-    img.src = user.photoURL;
-    img.hidden = false;
-    img.onerror = () => (img.hidden = true);
-  } else {
-    img.hidden = true;
-  }
-  $("admin-link").hidden = profile?.admin !== true;
-}
 
 /* ---------- Library ---------- */
 
