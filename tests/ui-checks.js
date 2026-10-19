@@ -114,8 +114,11 @@ async (page) => {
     /* ---------- Scroll view ---------- */
     await page.goto(`${BASE}/#/read/chapter-2/5`);
     await wait(600);
+    await page.locator("#btn-account").click();
+    check("The account menu sits in the reader's top bar", await evalPage(() => !!document.querySelector("#reader-account-slot #account-menu:not([hidden])")));
     await page.locator("#btn-view-mode").click();
     await wait(500);
+    check("Switching the view closes the account menu", await evalPage(() => document.getElementById("account-menu").hidden));
     const activeIndex = () => evalPage(() => Number(document.querySelector(".flow-p.is-active")?.dataset.index));
     check("Switching to scroll view keeps the same paragraph", (await activeIndex()) === 4, String(await activeIndex()));
     check("Scroll view shows the whole chapter", (await page.locator(".flow-p").count()) > 1);

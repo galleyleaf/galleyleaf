@@ -55,7 +55,8 @@ This is the public template. Each author deploys their own copy into their own F
     - **What it doesn't stop:** a script can still use up the free daily writes, because one batch can write the same comment up to 500 times for one +1. Every write in a batch is checked against the state before the batch, so rules can't tell the copies apart; the Firestore emulator confirmed this. On Spark that means saving fails until the next day and nothing is charged. Closing it fully would need Cloud Functions.
   - The comment icon changes colour when the paragraph has comments.
 - **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser.
-- **Two reading views:** the reader switches between them with the top-bar toggle, and the choice is saved.
+- **Account menu:** the avatar in the top bar opens one menu, in both the library and the reader. It holds the view switch (reader only), text size, theme, the admin link and sign out. `show()` in `js/app.js` moves it into the visible top bar.
+- **Two reading views:** the reader switches between them from the account menu, and the choice is saved.
   - **Paragraph view** shows one paragraph at a time, with Prev/Next, swipe and ←/→.
   - **Scroll view** shows the whole chapter, and the paragraph at the reading line (35% down the viewport) is highlighted. Comments and bookmarks still attach to that paragraph.
 - **Saved in the browser (`localStorage`):** progress, bookmarks, finished chapters, theme, text size and view. They are kept per account (`reader:{uid}:...`), and preferences use `reader:pref:{name}`.
@@ -147,7 +148,7 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 43 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 45 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in, and removed and restored access
 - both reading views
 - comments (including the daily limit), bookmarks and chapter completion
