@@ -9,6 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
   doc,
+  getDoc,
   onSnapshot,
   setDoc,
   serverTimestamp,
@@ -39,6 +40,35 @@ export async function signIn() {
       return;
     }
     if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
+    throw err;
+  }
+}
+
+/**
+ * Returns the user's profile, creating it on first sign-in. New accounts start
+ * approved; the site owner's account starts as admin. Every page that needs
+ * the profile calls this, so the first sign-in can happen on any of them.
+ */
+export async function ensureProfile(user) {
+  const ref = doc(db, "users", user.uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) return snap.data();
+  const owner = await siteOwnerEmail();
+  const profile = {
+    displayName: (user.displayName || "").slice(0, 100),
+    email: user.email || "",
+    photoURL: GOOGLE_PHOTO.test(user.photoURL || "") && user.photoURL.length <= 500 ? user.photoURL : "",
+    approved: true,
+    admin: !!owner && (user.email || "").toLowerCase() === owner,
+    createdAt: serverTimestamp(),
+  };
+  try {
+    await setDoc(ref, profile);
+    return profile;
+  } catch (err) {
+    // Another tab may have created it first; the rules then refuse this write.
+    const again = await getDoc(ref);
+    if (again.exists()) return again.data();
     throw err;
   }
 }
@@ -75,18 +105,11 @@ export function watchAccess(callback) {
       ref,
       (snap) => {
         if (!snap.exists()) {
-          // First login: create the profile. New accounts start approved; the
-          // snapshot fires again once the document exists.
+          // First login: create the profile. The snapshot fires again once
+          // the document exists.
           if (creating) return;
           creating = true;
-          siteOwnerEmail().then((owner) => setDoc(ref, {
-            displayName: (user.displayName || "").slice(0, 100),
-            email: user.email || "",
-            photoURL: GOOGLE_PHOTO.test(user.photoURL || "") && user.photoURL.length <= 500 ? user.photoURL : "",
-            approved: true,
-            admin: !!owner && (user.email || "").toLowerCase() === owner,
-            createdAt: serverTimestamp(),
-          })).catch((error) => callback({ state: "error", user, error }));
+          ensureProfile(user).catch((error) => callback({ state: "error", user, error }));
           return;
         }
         const profile = snap.data();

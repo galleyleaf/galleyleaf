@@ -146,6 +146,19 @@ async (page) => {
     await page.getByRole("button", { name: "Approve" }).click();
     await wait(300);
     check("Approving moves the reader to approved", (await page.locator("#pending-list li").count()) === 0);
+
+    /* ---------- First sign-in on an admin page ---------- */
+    const firstSignIn = async (ownerEmail) => {
+      await page.context().route("**/site.json", (route) => route.fulfill({ json: { ownerEmail } }));
+      await evalPage(() => localStorage.setItem("mock:fresh", "1"));
+      await open("admin/");
+      await page.context().unroute("**/site.json");
+    };
+    await firstSignIn("reader@example.com");
+    check("Owner's first sign-in on the admin page makes them admin", await visible("#content"), await text("#status"));
+    await firstSignIn("someone-else@example.com");
+    check("Anyone else's first sign-in on the admin page isn't admin", (await text("#status")).includes("isn’t an admin"), await text("#status"));
+    await evalPage(() => localStorage.removeItem("mock:fresh"));
   } catch (err) {
     results.push(`FAIL  Test run stopped: ${String(err.message || err).split("\n")[0]}`);
   }

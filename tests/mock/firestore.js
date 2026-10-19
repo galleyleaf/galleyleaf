@@ -4,6 +4,8 @@
 // - The signed-in user (u1) is approved, unless localStorage "mock:approved" = "0"
 //   (simulates an admin removing access).
 // - window.__approve() approves u1 live, to test the pending -> library switch.
+// - localStorage "mock:fresh" = "1" starts with no profile for u1, as on a
+//   first sign-in, so the app has to create it.
 
 const origin = location.origin;
 const { parseBook } = await import(`${origin}/js/md-parser.js`);
@@ -20,6 +22,7 @@ const users = {
   u3: { displayName: "Marco Lima", email: "marco@example.com", photoURL: "", approved: true, admin: false, createdAt: ts(900) },
 };
 users.u1.approved = localStorage.getItem("mock:approved") !== "0";
+if (localStorage.getItem("mock:fresh") === "1") delete users.u1;
 
 // Other readers' comments, visible on the admin page.
 const otherComments = [
@@ -99,7 +102,12 @@ export const getDocs = async () => ({ forEach() {}, docs: [] });
 
 /* ---------- Writes ---------- */
 
-export async function setDoc() {}
+export async function setDoc(ref, data) {
+  if (!ref.path.startsWith("users/")) return;
+  users[ref.id] = { ...data };
+  emit(listeners.users);
+  emit(listeners.me);
+}
 
 export async function addDoc(_ref, data) {
   const id = `c${++nextId}`;

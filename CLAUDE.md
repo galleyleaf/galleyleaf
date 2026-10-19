@@ -42,7 +42,7 @@ This is the public template. Each author deploys their own copy into their own F
   - **Removing access:** an admin removes it from `/admin/` ("Remove access"), or by setting `approved: false` in the console.
   - **What a removed reader sees:** an "access paused" screen.
   - **Restoring access:** "Approve" turns it back on, and the screen switches to the library live, with no reload.
-- **Admins:** the site owner (the email given to `setup.sh`) becomes admin on first sign-in. The rules allow `admin: true` on create only for that verified Google address (`isSiteOwner()`), and `js/auth.js` reads it from `/site.json`. Other admins are set in the Firebase console. Admins can:
+- **Admins:** the site owner (the email given to `setup.sh`) becomes admin on first sign-in, on any page: the reader and both admin pages create a missing profile through `ensureProfile()` in `js/auth.js`. The rules allow `admin: true` on create only for that verified Google address (`isSiteOwner()`), and `js/auth.js` reads it from `/site.json`. Other admins are set in the Firebase console. Admins can:
   - read all profiles
   - change only the `approved` flag
   - read every reader's comments, and delete any of them (spam cleanup)
@@ -128,15 +128,16 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 32 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 34 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in, and removed and restored access
 - both reading views
 - comments, bookmarks and chapter completion
-- the admin page
+- the admin page, including a first sign-in that happens there
 
 The test swaps the gstatic Firebase files for the mock in `tests/mock/`, which builds the book from `tests/fixtures/sample-book.md`, a short original sample manuscript. It keeps users and comments in memory and runs no security rules, so it never touches the real project. The mock's test hooks are:
 - `localStorage["mock:approved"] = "0"` simulates a reader whose access was removed.
 - `window.__approve()` restores access live.
+- `localStorage["mock:fresh"] = "1"` starts with no profile, as on a first sign-in.
 
 When you change UI labels or ids, update `tests/ui-checks.js`. The security rules themselves are untested; the Firebase Emulator Suite would be the way to test them.
 
