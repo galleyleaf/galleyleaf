@@ -10,7 +10,7 @@ Galleyleaf is a small website that you deploy into your own free Firebase projec
 - **Discourages casual copying.** Text can't be selected, copied or printed from the reader.
 - **Free to run.** Everything fits in Firebase's free Spark plan, and there's no billing to set up.
 
-Setup takes about 10 minutes in your browser: create a project on the Firebase website, then run one command. You don't need to install anything. A Galleyleaf phone app for readers is on the way.
+Setup takes about 10 minutes in your browser: create a project on the Firebase website, then let the [Galleyleaf setup page](https://galleyleaf.web.app/setup) do the rest. You don't need to install anything. A Galleyleaf phone app for readers is on the way.
 
 ## What you need
 
@@ -29,27 +29,13 @@ Setup takes about 10 minutes in your browser: create a project on the Firebase w
 5. Click **Create project** and wait until it's ready.
    - It's created on the free Spark plan, and you don't need to upgrade.
 
-### 2. Run the setup
+### 2. Run the setup page
 
-[![Open in Cloud Shell](https://www.gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/galleyleaf/galleyleaf&cloudshell_workspace=.)
-
-1. **Click "Open in Cloud Shell"** above and sign in with the same Google account.
-   - **Cloud Shell** is Google's free terminal in the browser.
-   - If it asks whether to trust the repository, confirm. Galleyleaf's files open automatically.
-2. **In the terminal at the bottom, run:**
-
-   ```bash
-   ./setup.sh
-   ```
-
-3. **Sign in to Firebase** when it asks: open the link it shows, approve the access, and paste the code back into the terminal.
-4. **Answer a few questions:**
-   - **Your book's title.**
-   - **Your admin email.** The suggestion is the account you're signed in with.
-   - **Your project.** Pick the project you created in step 1 from the list. A brand-new project can take a minute to appear; you can also type its id.
-   - **A region** for your data, near your readers.
-
-   The script then creates your database and deploys your site.
+1. **Open [galleyleaf.web.app/setup](https://galleyleaf.web.app/setup)** and sign in with the same Google account.
+   - Google asks you to let Galleyleaf manage your Firebase projects. That's how the page sets up your site for you. It only changes the project you choose, it works from your browser, and the access expires after an hour.
+   - Google may say the app hasn't been verified yet. Choose **Advanced**, then **Go to galleyleaf.firebaseapp.com**.
+2. **Choose your project**, then check the book title, the admin email and where to keep your data.
+3. **Click "Set up my book"** and wait for the checklist to finish. It ends with your site's address.
 
 ### 3. Start sharing
 
@@ -62,11 +48,10 @@ From `https://<your-project>.web.app/admin/` you can:
 - read every comment, filtered by chapter or reader, and delete spam
 
 **If something goes wrong:**
-- **Setup stops with an error.** Read the message: it says what to do. Then run `./setup.sh` again; it skips what's already done.
-- **"Can't open the Firebase project".** Make sure you created it in the console with the same Google account you signed in to Cloud Shell with, and that the id is right. A brand-new project can take a minute.
-- **You want to see what would happen first.** Run `./setup.sh --dry-run`. It only shows the steps.
-- **You want to change your answers or pick another project.** Run `./setup.sh --reconfigure`.
+- **Setup stops with an error.** Read the message: it says what to do. Then click **Try again**; it picks up where it stopped.
+- **Your project isn't listed.** Make sure you created it with the same Google account you signed in with. A brand-new project can take a minute: click **Look again**.
 - **You signed in to your site before running setup.** Your account was created without admin rights. In the [Firebase console](https://console.firebase.google.com/), open **Firestore Database** › `users`, find your email and set `admin` to `true`.
+- **You want to remove Galleyleaf's access.** Go to your [Google account's third-party connections](https://myaccount.google.com/connections). Your site keeps working.
 
 ## Preparing your manuscript
 
@@ -106,13 +91,7 @@ A line with only three dashes marks a scene break.
 
 ## Updating to a new version
 
-Open [Cloud Shell](https://shell.cloud.google.com/), go to the Galleyleaf folder (`cd ~/cloudshell_open/galleyleaf` if you used the button) and run:
-
-```bash
-git pull && ./setup.sh
-```
-
-Your answers are saved in `book.config.json`, so it just redeploys. Your own settings live in files that `git pull` never touches.
+Open the [setup page](https://galleyleaf.web.app/setup) again, sign in and choose the same project. It recognises your site, shows its version, and offers **Update my site**. Your book, your readers and their notes stay as they are.
 
 ## Costs and limits
 
@@ -126,6 +105,21 @@ Your answers are saved in `book.config.json`, so it just redeploys. Your own set
 - **Security rules:** `firestore.rules`.
 - **UI tests:** `tests/run-ui-tests.sh` runs them in a real browser against a mocked Firebase and the sample manuscript. It needs `python3` and `playwright-cli`.
 - **Project conventions:** `CLAUDE.md`.
+
+### Set up from a terminal
+
+`setup.sh` does what the setup page does, with the Firebase CLI. It needs `node` and `git`; [Google Cloud Shell](https://shell.cloud.google.com/) has both:
+
+[![Open in Cloud Shell](https://www.gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/galleyleaf/galleyleaf&cloudshell_workspace=.)
+
+```bash
+./setup.sh               # signs in to Firebase, asks a few questions, then deploys
+./setup.sh --dry-run     # shows the steps without changing anything
+./setup.sh --reconfigure # asks the questions again, for example to pick another project
+git pull && ./setup.sh   # updates to the latest version
+```
+
+Your answers are saved in `book.config.json`. It and the other generated files are git-ignored, so `git pull` never conflicts. Sites set up either way can be updated either way.
 
 ## License
 
