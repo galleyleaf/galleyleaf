@@ -54,9 +54,16 @@ $("file").addEventListener("change", async (e) => {
   const isDocx = /\.docx$/i.test(file.name);
   try {
     parsed = isDocx ? await parseDocx(await file.arrayBuffer(), file.name) : parseBook(await file.text());
-  } catch {
+  } catch (err) {
     parsed = null;
-    status(isDocx ? "This file couldn’t be read as a Word document. Save it as .docx (not .doc) and try again." : "This file couldn’t be read as Markdown.", true);
+    status(
+      err.message === "too-large"
+        ? "This Word file is too large to read."
+        : isDocx
+          ? "This file couldn’t be read as a Word document. Save it as .docx (not .doc) and try again."
+          : "This file couldn’t be read as Markdown.",
+      true
+    );
     return;
   }
   if (!parsed.sections.length) {

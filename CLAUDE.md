@@ -50,7 +50,8 @@ This is the public template. Each author deploys their own copy into their own F
 - **Comments:**
   - Each comment is stored per paragraph at `users/{uid}/comments`.
   - Only its author and admins can read it.
-  - Only the author can create or edit it, and only while approved. The author or an admin can delete it.
+  - Only the author can create or edit it, and only while approved. The author (while approved) or an admin can delete it. A reader whose access is removed can't read or delete their comments until access is restored.
+  - **Daily limit:** each reader can make 300 comment creates and edits per day, counted in `users/{uid}/limits/commentWrites`, which is written in the same batch as the comment and names it. It keeps a script from using up the project's free daily writes. The limit is in both `firestore.rules` and `js/comments.js`.
   - The comment icon changes colour when the paragraph has comments.
 - **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser.
 - **Two reading views:** the reader switches between them with the top-bar toggle, and the choice is saved.
@@ -66,13 +67,16 @@ This is the public template. Each author deploys their own copy into their own F
 - **Chapter completion:** shows a confetti and check celebration, which is skipped when the reader prefers reduced motion.
 - **Loading:** `index.html` has `modulepreload` links for every module the reader page imports, so they download in parallel. Add a link when you add a module to that import graph. The admin pages don't use preloads.
 - **Caching:** JS and CSS are served with `Cache-Control: no-cache`, so deploys show up immediately.
+- **Security headers:** HTML pages (`**/*.html`, `/` and `/admin/`) get a Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff` and a `Referrer-Policy`. They're set on pages only, because `frame-ancestors` on Firebase's `/__/auth/` pages would break popup sign-in. When you load something from a new origin, add it to the CSP in all three header blocks of `firebase.json`; the UI tests apply the CSP and fail on anything it blocks.
+- **Admin page reads:** it subscribes to every comment, which is fine at a beta-reader scale. Paging it would need `orderBy` on a collection-group query, which needs an index the setup page doesn't deploy. Excerpts are fetched only for chapters in `book/meta`, since a comment's `chapterId` is chosen by the reader.
 
 ## Data model (Firestore)
 
 | Path | Fields | Access |
 |---|---|---|
 | `users/{uid}` | `displayName`, `email`, `photoURL`, `approved`, `admin`, `createdAt` | Owner creates it once, with `approved: true` and `admin: false`. Owner and admins can read it. Admins can update `approved` only. |
-| `users/{uid}/comments/{id}` | `chapterId`, `paragraphIndex`, `text` (≤ 2000 chars), `createdAt`, `updatedAt` | Owner reads and writes while approved. Admins read through a collection-group query. |
+| `users/{uid}/comments/{id}` | `chapterId`, `paragraphIndex`, `text` (≤ 2000 chars), `createdAt`, `updatedAt` | Owner reads, writes and deletes while approved; each create or edit must advance the quota below. Admins read through a collection-group query and can delete. |
+| `users/{uid}/limits/commentWrites` | `count` (1–300), `windowStart`, `commentId`, `updatedAt` | Owner reads and writes while approved: +1 within a day of `windowStart`, or a new window at 1 after that. Never deleted. |
 | `book/meta` | `title`, `author`, `dedication`, `chapters[{id,title,order,paragraphCount}]`, `updatedAt` | Approved users can read it. Admins can write it. |
 | `chapters/{id}` | `title`, `order`, `paragraphs[]` (HTML with only `<em>` and `<strong>`), `breaks[]` | Approved users and admins can read it. Admins can write it. |
 
@@ -133,7 +137,8 @@ npx -y firebase-tools@latest deploy --only firestore:rules --dry-run --project <
 Hosting serves the project root and ignores:
 - the deploy settings: `firebase.json`, `firebase.deploy.json`, `firestore.rules` and `firestore.deploy.rules`
 - `setup.sh` and `book.config.json`
-- `book.md` and any `.docx`
+- manuscripts and drafts anywhere: `**/*.md`, `.markdown`, `.docx`, `.doc`, `.odt`, `.rtf`, `.pdf`
+- `**/*.log`, such as `firebase-debug.log`
 - the docs: `CLAUDE.md`, `README.md` and `LICENSE`
 - `tests/**`, `docs/**` and dotfiles
 
@@ -141,19 +146,21 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 40 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 43 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in, and removed and restored access
 - both reading views
-- comments, bookmarks and chapter completion
+- comments (including the daily limit), bookmarks and chapter completion
 - the admin page, including a first sign-in that happens there
 - reading a `.docx` on the publish page (`tests/fixtures/sample-book.docx`, made from the sample manuscript with `pandoc`)
 - waiting for the security rules right after setup
+- the security headers: every HTML page is served with the CSP from `firebase.json`, and any violation fails
 
 The test swaps the gstatic Firebase files for the mock in `tests/mock/`, which builds the book from `tests/fixtures/sample-book.md`, a short original sample manuscript. It keeps users and comments in memory and runs no security rules, so it never touches the real project. The mock's test hooks are:
 - `localStorage["mock:approved"] = "0"` simulates a reader whose access was removed.
 - `window.__approve()` restores access live.
 - `localStorage["mock:fresh"] = "1"` starts with no profile, as on a first sign-in.
 - `localStorage["mock:notReady"] = "N"` refuses the first N profile reads with `permission-denied`, as before new rules arrive.
+- `localStorage["mock:quotaUsed"] = "N"` starts the reader's daily comment count at N.
 
 When you change UI labels or ids, update `tests/ui-checks.js`. The security rules themselves are untested; the Firebase Emulator Suite would be the way to test them.
 

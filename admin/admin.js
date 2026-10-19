@@ -226,7 +226,11 @@ function renderPeople() {
 /* ---------- Comments ---------- */
 
 async function loadExcerpts() {
-  const needed = [...new Set(state.comments.map((c) => c.chapterId))].filter((id) => !state.paragraphs.has(id));
+  // Only chapters of the published book: a comment's chapterId is chosen by the reader,
+  // so unknown ids would each cost a read.
+  const needed = [...new Set(state.comments.map((c) => c.chapterId))].filter(
+    (id) => state.chapters.has(id) && !state.paragraphs.has(id)
+  );
   await Promise.all(
     needed.map(async (id) => {
       try {

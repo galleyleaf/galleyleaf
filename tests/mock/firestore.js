@@ -8,6 +8,7 @@
 //   profile with permission-denied, as before new security rules arrive.
 // - localStorage "mock:fresh" = "1" starts with no profile for u1, as on a
 //   first sign-in, so the app has to create it.
+// - localStorage "mock:quotaUsed" = "N" starts u1's daily comment quota at N writes.
 
 const origin = location.origin;
 const { parseBook } = await import(`${origin}/js/md-parser.js`);
@@ -31,9 +32,11 @@ const otherComments = [
   { id: "x1", uid: "u3", chapterId: "chapter-2", paragraphIndex: 4, text: "Loved this moment.", createdAt: ts(60), updatedAt: ts(60) },
 ];
 
-// The signed-in user's comments.
+// The signed-in user's comments, and their daily comment quota.
 const myComments = new Map();
 let nextId = 0;
+const quotaUsed = Number(localStorage.getItem("mock:quotaUsed") || 0);
+let quota = quotaUsed ? { count: quotaUsed, windowStart: ts(60), commentId: "c0", updatedAt: ts(60) } : null;
 
 let notReady = Number(localStorage.getItem("mock:notReady") || 0);
 const refuse = () => notReady > 0 && notReady-- > 0;
@@ -45,7 +48,11 @@ const emit = (set) => set.forEach((fn) => fn());
 /* ---------- References ---------- */
 
 export const getFirestore = () => ({});
-export const doc = (_db, ...path) => ({ path: path.join("/"), id: path[path.length - 1] });
+export const doc = (parent, ...path) => {
+  // doc(collectionRef) gets an auto id, as in the real SDK.
+  if (!path.length) path = [...parent.path.split("/"), `c${++nextId}`];
+  return { path: path.join("/"), id: path[path.length - 1] };
+};
 export const collection = (_db, ...path) => ({ path: path.join("/") });
 export const collectionGroup = (_db, name) => ({ path: name, group: true });
 export const where = (field, _op, value) => ({ field, value });
@@ -91,6 +98,7 @@ window.__approve = () => {
 };
 
 export async function getDoc(ref) {
+  if (ref.path.endsWith("/limits/commentWrites")) return { exists: () => !!quota, data: () => quota };
   if (ref.path.startsWith("users/") && refuse()) throw denied();
   if (ref.path.startsWith("users/")) return { exists: () => !!users[ref.id], data: () => users[ref.id] };
   const book = await bookPromise;
@@ -148,4 +156,20 @@ export async function deleteDoc(ref) {
   emit(listeners.group);
 }
 
-export const writeBatch = () => ({ set() {}, delete() {}, commit: async () => {} });
+// Comment and quota writes are applied on commit; others (the upload page) are dropped.
+export const writeBatch = () => {
+  const ops = [];
+  return {
+    set: (ref, data) => ops.push(() => {
+      if (ref.path.endsWith("/limits/commentWrites")) quota = { ...data };
+      else if (ref.path.includes("/comments/")) myComments.set(ref.id, { ...data, id: ref.id, uid: "u1" });
+    }),
+    update: (ref, data) => ops.push(() => Object.assign(myComments.get(ref.id), data)),
+    delete() {},
+    commit: async () => {
+      ops.forEach((op) => op());
+      emit(listeners.mine);
+      emit(listeners.group);
+    },
+  };
+};

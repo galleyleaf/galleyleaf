@@ -27,9 +27,22 @@ rules_version = '2';
 //   - text: string (required, 1-2000 chars)
 //   - createdAt: timestamp (required, server time on create, immutable)
 //   - updatedAt: timestamp (required, server time on every write)
-//   Only the owning, approved user can create or edit. The owner and admins can
-//   read (admins via a collection group query on "comments"). The owner and
-//   admins can delete (admins remove spam).
+//   Only the owning, approved user can create or edit, and each create or edit
+//   must advance the daily quota below in the same batch. The owner and admins
+//   can read (admins via a collection group query on "comments"). The approved
+//   owner and admins can delete (admins remove spam).
+//
+// Subcollection: users/{uid}/limits
+// Document ID: "commentWrites"
+// Fields:
+//   - count: int (required, 1-300 comment creates and edits in the current window)
+//   - windowStart: timestamp (required, server time when the window began)
+//   - commentId: string (required, 1-100 chars, the comment this write counts)
+//   - updatedAt: timestamp (required, server time on every write)
+//   Caps how many comment writes one reader can make per day, so a script can't
+//   use up the project's free daily write quota. A write either adds 1 within
+//   the window, or, a day after windowStart, starts a new window at 1.
+//   Only the approved owner can read and write it; it is never deleted.
 //
 // Collection: book
 // Document ID: "meta"
@@ -118,6 +131,19 @@ service cloud.firestore {
         && request.auth.token.get('email', '').lower() == '__OWNER_EMAIL__';
     }
 
+    function commentQuotaPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid)/limits/commentWrites;
+    }
+
+    // True when this same request (batch) also advances the comment quota for
+    // this comment. Naming the comment stops one +1 from covering a whole batch
+    // of comments. The quota document's own rules make sure the advance is a valid +1.
+    function advancesCommentQuota(commentId) {
+      return existsAfter(commentQuotaPath())
+        && getAfter(commentQuotaPath()).data.updatedAt == request.time
+        && getAfter(commentQuotaPath()).data.commentId == commentId;
+    }
+
     function areImmutableFieldsUnchanged(fields) {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
     }
@@ -150,6 +176,24 @@ service cloud.firestore {
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
         && data.updatedAt == request.time;
+    }
+
+    // Must match MAX_COMMENT_WRITES_PER_DAY in js/comments.js.
+    function isValidCommentQuota(data) {
+      let fields = ['count', 'windowStart', 'commentId', 'updatedAt'];
+      return hasOnlyAllowedFields(fields)
+        && hasRequiredFields(fields)
+        && data.count is int
+        && data.count >= 1
+        && data.count <= 300
+        && data.windowStart is timestamp
+        && data.windowStart <= request.time
+        && isStringWithin(data.commentId, 1, 100)
+        && data.updatedAt == request.time;
+    }
+
+    function startsNewQuotaWindow(data) {
+      return data.count == 1 && data.windowStart == request.time;
     }
 
     function isValidMeta(data) {
@@ -214,16 +258,42 @@ service cloud.firestore {
         allow create: if isOwner(userId)
           && isApproved()
           && isValidComment(request.resource.data)
-          && request.resource.data.createdAt == request.time;
+          && request.resource.data.createdAt == request.time
+          && advancesCommentQuota(commentId);
 
         allow update: if isOwner(userId)
           && isApproved()
           && isValidComment(request.resource.data)
+          && advancesCommentQuota(commentId)
           && areImmutableFieldsUnchanged(['chapterId', 'paragraphIndex', 'createdAt'])
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'updatedAt']);
 
-        // Owners delete their own; admins can remove any comment (spam cleanup).
+        // Approved owners delete their own; admins can remove any comment (spam cleanup).
         allow delete: if (isOwner(userId) && isApproved()) || isAdmin();
+      }
+
+      match /limits/{limitId} {
+        allow read: if isOwner(userId) && isApproved();
+
+        allow create: if isOwner(userId)
+          && isApproved()
+          && limitId == 'commentWrites'
+          && isValidCommentQuota(request.resource.data)
+          && startsNewQuotaWindow(request.resource.data);
+
+        // +1 within the current window, or a fresh window once a day has passed.
+        allow update: if isOwner(userId)
+          && isApproved()
+          && limitId == 'commentWrites'
+          && isValidCommentQuota(request.resource.data)
+          && (
+            (request.resource.data.windowStart == resource.data.windowStart
+              && request.resource.data.count == resource.data.count + 1)
+            || (request.time > resource.data.windowStart + duration.value(1, 'd')
+              && startsNewQuotaWindow(request.resource.data))
+          );
+
+        allow delete: if false;
       }
     }
 

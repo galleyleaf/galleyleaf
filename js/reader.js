@@ -570,8 +570,11 @@ el.form.addEventListener("submit", async (e) => {
     }
     resetForm();
     renderCommentList();
-  } catch {
-    el.error.textContent = "Your comment wasn’t saved. Check your connection and try again.";
+  } catch (err) {
+    el.error.textContent =
+      err.code === "quota-exceeded"
+        ? "You’ve reached today’s limit for comments and edits. You can add more tomorrow."
+        : "Your comment wasn’t saved. Check your connection and try again.";
     el.error.hidden = false;
   } finally {
     el.save.disabled = false;

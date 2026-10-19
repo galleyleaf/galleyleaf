@@ -10,8 +10,28 @@ import { PLACEHOLDER, dropEmptySections, escapeHtml, slugify } from "./md-parser
 
 const SCENE_BREAK = /^[*#~⁂•·—–-](\s*[*#~⁂•·—–-])*$/;
 const GENERIC_AUTHORS = /^(microsoft office user|user|author|unknown|python-docx)$/i;
+// Far more than any manuscript's XML; stops a crafted file from inflating to gigabytes.
+const MAX_PART_BYTES = 100 * 1024 * 1024;
 
 /* ---------- Zip ---------- */
+
+// Inflates raw deflate data, giving up once it passes MAX_PART_BYTES.
+async function inflate(data) {
+  const reader = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > MAX_PART_BYTES) {
+      reader.cancel();
+      throw new Error("too-large");
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(await new Blob(chunks).arrayBuffer());
+}
 
 async function unzip(buffer, wanted) {
   const bytes = new Uint8Array(buffer);
@@ -26,18 +46,19 @@ async function unzip(buffer, wanted) {
     if (view.getUint32(p, true) !== 0x02014b50) throw new Error("bad-zip");
     const method = view.getUint16(p + 10, true);
     const size = view.getUint32(p + 20, true);
+    const unpacked = view.getUint32(p + 24, true);
     const nameLen = view.getUint16(p + 28, true);
     const skip = nameLen + view.getUint16(p + 30, true) + view.getUint16(p + 32, true);
     const local = view.getUint32(p + 42, true);
     const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen));
     p += 46 + skip;
     if (!wanted.includes(name)) continue;
+    if (unpacked > MAX_PART_BYTES) throw new Error("too-large");
 
     const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
     const data = bytes.subarray(start, start + size);
     if (method === 0) files[name] = new TextDecoder().decode(data);
-    else if (method === 8)
-      files[name] = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+    else if (method === 8) files[name] = await inflate(data);
     else throw new Error("unsupported-zip");
   }
   return files;

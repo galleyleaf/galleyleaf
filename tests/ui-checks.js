@@ -20,6 +20,22 @@ async (page) => {
     );
   }
 
+  // Serve HTML pages with the Content-Security-Policy and other headers from firebase.json,
+  // as Firebase Hosting would, and record anything the policy blocks.
+  const hosting = (await (await page.request.fetch(`${BASE}/firebase.json`)).json()).hosting;
+  const pageHeaders = Object.fromEntries(
+    hosting.headers.find((h) => h.source === "**/*.html").headers.map((h) => [h.key.toLowerCase(), h.value])
+  );
+  const cspViolations = [];
+  page.on("console", (msg) => {
+    if (msg.text().includes("Content Security Policy")) cspViolations.push(msg.text());
+  });
+  await page.context().route(`${BASE}/**`, async (route) => {
+    if (route.request().resourceType() !== "document") return route.fallback();
+    const response = await route.fetch();
+    await route.fulfill({ response, headers: { ...response.headers(), ...pageHeaders } });
+  });
+
   // Full page load (a hash-only change would not reload the mock).
   const open = async (path) => {
     await page.goto(`${BASE}/${path}`);
@@ -134,6 +150,19 @@ async (page) => {
     await page.locator("#btn-to-library").click();
     await wait(300);
 
+    /* ---------- Daily comment limit ---------- */
+    await evalPage(() => localStorage.setItem("mock:quotaUsed", "300"));
+    await evalPage(() => localStorage.setItem("reader:pref:readMode", '"paragraph"'));
+    await open("#/read/chapter-1/1");
+    await page.locator("#passage-text").click();
+    await wait(200);
+    await page.fill("#comment-text", "One too many");
+    await page.getByRole("button", { name: "Save comment" }).click();
+    await wait(300);
+    check("Comments stop at the daily limit", (await text("#comment-error")).includes("today’s limit"), await text("#comment-error"));
+    await page.locator("#btn-close-comments").click();
+    await evalPage(() => localStorage.removeItem("mock:quotaUsed"));
+
     /* ---------- Admin ---------- */
     await open("admin/");
     check("Admin page lists readers with access removed", (await page.locator("#pending-list li").count()) === 1);
@@ -189,6 +218,10 @@ async (page) => {
     await wait(4000);
     check("Admin page opens by itself once they are", await visible("#content"));
     await evalPage(() => localStorage.removeItem("mock:notReady"));
+
+    /* ---------- Security headers ---------- */
+    check("Pages send the security headers", !!pageHeaders["content-security-policy"] && pageHeaders["x-frame-options"] === "DENY");
+    check("The Content-Security-Policy blocks nothing the site uses", cspViolations.length === 0, cspViolations.slice(0, 2).join(" | "));
   } catch (err) {
     results.push(`FAIL  Test run stopped: ${String(err.message || err).split("\n")[0]}`);
   }
