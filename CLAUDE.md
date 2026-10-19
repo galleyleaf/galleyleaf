@@ -83,6 +83,8 @@ This is the public template. Each author deploys their own copy into their own F
 - A blank line separates paragraphs. A `---` line marks a scene break. `_x_` or `*x*` makes italics, and `**x**` makes bold.
 - After editing the book, republish it from `/admin/upload.html`.
 
+- **Right after setup, the site waits for its security rules.** Rules published through the API can take several minutes to reach a new database, which refuses everything until then. A refused read of the user's **own** profile can only mean that, so `whenRulesReady()` and `watchAccess()` in `js/auth.js` retry for up to 10 minutes. Meanwhile the reader shows "Your site is getting ready" (the `starting` state) and the admin pages say the same in their status line.
+
 ## Setup and deploy
 
 Authors set up and update their site from the **Galleyleaf setup page** (`https://galleyleaf.web.app/setup/`, private repo `galleyleaf/hub`). It runs the steps below from the browser through Google's APIs, deploying the files of the **latest GitHub release** of this repo. `./setup.sh` does the same from a terminal (made for Google Cloud Shell) and is the path for developers. It:
@@ -130,16 +132,18 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 34 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 38 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in, and removed and restored access
 - both reading views
 - comments, bookmarks and chapter completion
 - the admin page, including a first sign-in that happens there
+- waiting for the security rules right after setup
 
 The test swaps the gstatic Firebase files for the mock in `tests/mock/`, which builds the book from `tests/fixtures/sample-book.md`, a short original sample manuscript. It keeps users and comments in memory and runs no security rules, so it never touches the real project. The mock's test hooks are:
 - `localStorage["mock:approved"] = "0"` simulates a reader whose access was removed.
 - `window.__approve()` restores access live.
 - `localStorage["mock:fresh"] = "1"` starts with no profile, as on a first sign-in.
+- `localStorage["mock:notReady"] = "N"` refuses the first N profile reads with `permission-denied`, as before new rules arrive.
 
 When you change UI labels or ids, update `tests/ui-checks.js`. The security rules themselves are untested; the Firebase Emulator Suite would be the way to test them.
 

@@ -197,6 +197,15 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
   animation: twinkle 1.4s ease-in-out infinite;
 }
 
+#view-loading { align-content: center; gap: 20px; }
+
+.loading-message {
+  max-width: 22rem;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+}
+
 @keyframes twinkle {
   0%, 100% { transform: scale(0.75) rotate(0deg); opacity: 0.5; }
   50% { transform: scale(1) rotate(45deg); opacity: 1; }

@@ -163,6 +163,23 @@ async (page) => {
     await firstSignIn("someone-else@example.com");
     check("Anyone else's first sign-in on the admin page isn't admin", (await text("#status")).includes("isn’t an admin"), await text("#status"));
     await evalPage(() => localStorage.removeItem("mock:fresh"));
+
+    /* ---------- Rules not ready yet, right after setup ---------- */
+    await evalPage(() => localStorage.setItem("mock:notReady", "1"));
+    await page.goto(`${BASE}/`);
+    await page.reload();
+    await wait(600);
+    check("Reader waits while the rules aren't ready", (await visible("#loading-message")) && !(await visible("#view-error")));
+    await wait(4000);
+    check("Reader opens by itself once they are", await visible("#view-library"));
+    await evalPage(() => localStorage.setItem("mock:notReady", "1"));
+    await page.goto(`${BASE}/admin/`);
+    await page.reload();
+    await wait(600);
+    check("Admin page waits while the rules aren't ready", (await text("#status")).includes("getting ready"), await text("#status"));
+    await wait(4000);
+    check("Admin page opens by itself once they are", await visible("#content"));
+    await evalPage(() => localStorage.removeItem("mock:notReady"));
   } catch (err) {
     results.push(`FAIL  Test run stopped: ${String(err.message || err).split("\n")[0]}`);
   }

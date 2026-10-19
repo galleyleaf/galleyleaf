@@ -8,7 +8,7 @@ import {
   writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { auth, db } from "../js/firebase.js";
-import { ensureProfile, signIn } from "../js/auth.js";
+import { ensureProfile, signIn, whenRulesReady } from "../js/auth.js";
 import { parseBook } from "../js/md-parser.js";
 
 const $ = (id) => document.getElementById(id);
@@ -33,7 +33,8 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
   try {
-    const profile = await ensureProfile(user);
+    const profile = await whenRulesReady(() => ensureProfile(user), () =>
+      status("Your site is getting ready. Right after setup this can take a few minutes. This page opens by itself."));
     if (profile.admin !== true) {
       status(`${user.email} isn’t an admin. Sign in with the admin email you gave during setup, or in the Firestore console set admin: true and approved: true on users/${user.uid}, then reload this page.`, true);
       return;

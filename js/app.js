@@ -341,6 +341,11 @@ watchAccess((next) => {
       }
       break;
 
+    case "starting":
+      $("loading-message").hidden = false;
+      show("loading");
+      break;
+
     case "error":
       if (!next.user) {
         $("login-error").textContent = "Sign-in didn’t finish. Try again.";

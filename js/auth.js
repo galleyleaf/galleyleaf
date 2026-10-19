@@ -53,6 +53,28 @@ export async function signIn() {
   }
 }
 
+// Right after setup, the security rules can take several minutes to reach the
+// new database, which refuses everything until then. A signed-in user may
+// always read their own profile, so "permission-denied" on it means the site
+// isn't ready yet: wait and try again rather than fail.
+const READY_TIMEOUT = 10 * 60 * 1000;
+const notReady = (error) => error?.code === "permission-denied";
+const nextDelay = (delay) => Math.min(delay * 1.5, 15000);
+
+/** Runs `fn`, retrying while the rules aren't ready. Calls `onWaiting` each time. */
+export async function whenRulesReady(fn, onWaiting) {
+  const started = Date.now();
+  for (let delay = 3000; ; delay = nextDelay(delay)) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (!notReady(error) || Date.now() - started > READY_TIMEOUT) throw error;
+      onWaiting?.();
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
 /**
  * Returns the user's profile, creating it on first sign-in. New accounts start
  * approved; the site owner's account starts as admin. Every page that needs
@@ -89,18 +111,21 @@ export function signOut() {
 /**
  * Watches auth + the user's profile document and reports one of:
  *   { state: "signed-out" }
+ *   { state: "starting", user }   the site is still getting ready after setup
  *   { state: "pending", user, profile }
  *   { state: "approved", user, profile }
  *   { state: "error", user, error }
  */
 export function watchAccess(callback) {
   let unsubProfile = null;
+  let retryTimer = null;
 
   getRedirectResult(auth).catch((error) => callback({ state: "error", user: null, error }));
 
   return onAuthStateChanged(auth, (user) => {
     unsubProfile?.();
     unsubProfile = null;
+    clearTimeout(retryTimer);
 
     if (!user) {
       callback({ state: "signed-out" });
@@ -108,23 +133,38 @@ export function watchAccess(callback) {
     }
 
     const ref = doc(db, "users", user.uid);
+    const started = Date.now();
+    let delay = 3000;
     let creating = false;
 
-    unsubProfile = onSnapshot(
-      ref,
-      (snap) => {
-        if (!snap.exists()) {
-          // First login: create the profile. The snapshot fires again once
-          // the document exists.
-          if (creating) return;
-          creating = true;
-          ensureProfile(user).catch((error) => callback({ state: "error", user, error }));
-          return;
+    const subscribe = () => {
+      unsubProfile = onSnapshot(
+        ref,
+        (snap) => {
+          if (!snap.exists()) {
+            // First login: create the profile. The snapshot fires again once
+            // the document exists.
+            if (creating) return;
+            creating = true;
+            whenRulesReady(() => ensureProfile(user), () => callback({ state: "starting", user }))
+              .catch((error) => callback({ state: "error", user, error }));
+            return;
+          }
+          const profile = snap.data();
+          callback({ state: profile.approved === true ? "approved" : "pending", user, profile });
+        },
+        (error) => {
+          // A refused listener stops, so listen again once the rules are ready.
+          if (notReady(error) && Date.now() - started < READY_TIMEOUT) {
+            callback({ state: "starting", user });
+            retryTimer = setTimeout(subscribe, delay);
+            delay = nextDelay(delay);
+            return;
+          }
+          callback({ state: "error", user, error });
         }
-        const profile = snap.data();
-        callback({ state: profile.approved === true ? "approved" : "pending", user, profile });
-      },
-      (error) => callback({ state: "error", user, error })
-    );
+      );
+    };
+    subscribe();
   });
 }

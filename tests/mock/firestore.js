@@ -4,6 +4,8 @@
 // - The signed-in user (u1) is approved, unless localStorage "mock:approved" = "0"
 //   (simulates an admin removing access).
 // - window.__approve() approves u1 live, to test the pending -> library switch.
+// - localStorage "mock:notReady" = "N" refuses the first N reads of u1's
+//   profile with permission-denied, as before new security rules arrive.
 // - localStorage "mock:fresh" = "1" starts with no profile for u1, as on a
 //   first sign-in, so the app has to create it.
 
@@ -33,6 +35,10 @@ const otherComments = [
 const myComments = new Map();
 let nextId = 0;
 
+let notReady = Number(localStorage.getItem("mock:notReady") || 0);
+const refuse = () => notReady > 0 && notReady-- > 0;
+const denied = () => Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+
 const listeners = { me: new Set(), users: new Set(), mine: new Set(), group: new Set() };
 const emit = (set) => set.forEach((fn) => fn());
 
@@ -50,7 +56,11 @@ export const serverTimestamp = () => ts();
 
 const snapDoc = (id, data, uid) => ({ id, data: () => data, ref: { parent: { parent: { id: uid } } } });
 
-export function onSnapshot(ref, next) {
+export function onSnapshot(ref, next, onError) {
+  if (ref.path.startsWith("users/") && !ref.filter && refuse()) {
+    setTimeout(() => onError?.(denied()), 20);
+    return () => {};
+  }
   let fn;
   let set;
   if (ref.group) {
@@ -81,6 +91,7 @@ window.__approve = () => {
 };
 
 export async function getDoc(ref) {
+  if (ref.path.startsWith("users/") && refuse()) throw denied();
   if (ref.path.startsWith("users/")) return { exists: () => !!users[ref.id], data: () => users[ref.id] };
   const book = await bookPromise;
   if (ref.path === "book/meta") {
