@@ -14,7 +14,7 @@ Setup takes about 10 minutes in your browser: create a project on the Firebase w
 
 ## What you need
 
-- A Google account. Your book's Firebase project will belong to it.
+- A Google account with 2-Step Verification turned on (Firebase requires it). Your book's Firebase project will belong to it.
 - Your manuscript as a Markdown file (`.md`). See [Preparing your manuscript](#preparing-your-manuscript).
 
 ## Set up your book site
@@ -22,6 +22,7 @@ Setup takes about 10 minutes in your browser: create a project on the Firebase w
 ### 1. Create your Firebase project
 
 1. Go to [console.firebase.google.com](https://console.firebase.google.com/) and sign in with the Google account you'll manage the book with.
+   - **Firebase requires 2-Step Verification** on your Google account. If it isn't on, Firebase asks you to turn it on first, or you can do it ahead of time at [myaccount.google.com/signinoptions/twosv](https://myaccount.google.com/signinoptions/twosv). It takes a couple of minutes and uses your phone.
 2. Click **Create a project** and give it a name, for example your book's title.
    - **The project id** is shown under the name. It becomes your site address (`<id>.web.app`) and can't be changed later. Click it to edit it if you like.
 3. **Accept the Firebase terms** when asked.
