@@ -149,7 +149,11 @@ async (page) => {
 
     /* ---------- First sign-in on an admin page ---------- */
     const firstSignIn = async (ownerEmail) => {
-      await page.context().route("**/site.json", (route) => route.fulfill({ json: { ownerEmail } }));
+      const ownerEmailHash = await page.evaluate(async (email) => {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
+        return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      }, ownerEmail);
+      await page.context().route("**/site.json", (route) => route.fulfill({ json: { ownerEmailHash } }));
       await evalPage(() => localStorage.setItem("mock:fresh", "1"));
       await open("admin/");
       await page.context().unroute("**/site.json");

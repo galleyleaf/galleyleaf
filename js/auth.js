@@ -16,16 +16,25 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { auth, db, googleProvider } from "./firebase.js";
 
-// The site owner's email, written to /site.json by setup.sh. The owner's
-// profile is created as admin; the security rules check the same address.
-async function siteOwnerEmail() {
+async function sha256(text) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Whether this is the site owner's email. Setup writes a SHA-256 hash of the
+// lowercased address to /site.json, so the address itself isn't published.
+// The owner's profile is created as admin; the security rules check the same
+// address.
+async function isSiteOwner(email) {
+  if (!email) return false;
   try {
     const res = await fetch("/site.json");
-    if (res.ok) return String((await res.json()).ownerEmail || "").toLowerCase();
+    if (!res.ok) return false;
+    const { ownerEmailHash } = await res.json();
+    return !!ownerEmailHash && ownerEmailHash === (await sha256(email.toLowerCase()));
   } catch {
-    /* no site.json: nobody is bootstrapped as admin */
+    return false; // no site.json: nobody is bootstrapped as admin
   }
-  return "";
 }
 
 // The security rules only accept Google-hosted profile photos (or none).
@@ -53,13 +62,13 @@ export async function ensureProfile(user) {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
   if (snap.exists()) return snap.data();
-  const owner = await siteOwnerEmail();
+  const owner = await isSiteOwner(user.email);
   const profile = {
     displayName: (user.displayName || "").slice(0, 100),
     email: user.email || "",
     photoURL: GOOGLE_PHOTO.test(user.photoURL || "") && user.photoURL.length <= 500 ? user.photoURL : "",
     approved: true,
-    admin: !!owner && (user.email || "").toLowerCase() === owner,
+    admin: owner,
     createdAt: serverTimestamp(),
   };
   try {

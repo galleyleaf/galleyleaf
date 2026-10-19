@@ -210,7 +210,8 @@ else
     const { TITLE, OWNER, PROJECT, LOCATION, ACCOUNT } = process.env;
     fs.writeFileSync("book.config.json", JSON.stringify(
       { title: TITLE, ownerEmail: OWNER, projectId: PROJECT, location: LOCATION }, null, 2) + "\n");
-    fs.writeFileSync("site.json", JSON.stringify({ ownerEmail: OWNER }) + "\n");
+    const hash = require("crypto").createHash("sha256").update(OWNER.toLowerCase()).digest("hex");
+    fs.writeFileSync("site.json", JSON.stringify({ ownerEmailHash: hash }) + "\n");
     const rules = fs.readFileSync("firestore.rules", "utf8");
     if (!rules.includes("__OWNER_EMAIL__")) throw new Error("firestore.rules has no __OWNER_EMAIL__ placeholder");
     fs.writeFileSync("firestore.deploy.rules", rules.replaceAll("__OWNER_EMAIL__", OWNER));
@@ -227,7 +228,14 @@ fi
 
 step "Deploying your site"
 info "Google sign-in, security rules and the website. This takes a minute or two."
+# The release message records the settings, so the Galleyleaf setup page can
+# recognise this site and offer to update it.
+version=$(git describe --tags --always 2>/dev/null || echo dev)
+message=$(TITLE="$title" OWNER="$owner" LOCATION="$location" VERSION="$version" node -e '
+  const { TITLE, OWNER, LOCATION, VERSION } = process.env;
+  process.stdout.write(JSON.stringify({ galleyleaf: VERSION, title: TITLE, ownerEmail: OWNER, location: LOCATION }));')
 run "${FB[@]}" deploy --only auth,firestore:rules,hosting --config firebase.deploy.json --project "$project" --non-interactive \
+  --message "$message" \
   || fail "The deploy didn't finish." "Scroll up for the error, then run ./setup.sh again. It picks up where it left off."
 
 # ---------- Done ----------

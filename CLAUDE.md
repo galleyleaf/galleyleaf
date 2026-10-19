@@ -42,7 +42,7 @@ This is the public template. Each author deploys their own copy into their own F
   - **Removing access:** an admin removes it from `/admin/` ("Remove access"), or by setting `approved: false` in the console.
   - **What a removed reader sees:** an "access paused" screen.
   - **Restoring access:** "Approve" turns it back on, and the screen switches to the library live, with no reload.
-- **Admins:** the site owner (the email given to `setup.sh`) becomes admin on first sign-in, on any page: the reader and both admin pages create a missing profile through `ensureProfile()` in `js/auth.js`. The rules allow `admin: true` on create only for that verified Google address (`isSiteOwner()`), and `js/auth.js` reads it from `/site.json`. Other admins are set in the Firebase console. Admins can:
+- **Admins:** the site owner (the email given to `setup.sh`) becomes admin on first sign-in, on any page: the reader and both admin pages create a missing profile through `ensureProfile()` in `js/auth.js`. The rules allow `admin: true` on create only for that verified Google address (`isSiteOwner()`), and `js/auth.js` compares the signed-in email with the SHA-256 hash in `/site.json`, so the address isn't published. Other admins are set in the Firebase console. Admins can:
   - read all profiles
   - change only the `approved` flag
   - read every reader's comments, and delete any of them (spam cleanup)
@@ -85,7 +85,7 @@ This is the public template. Each author deploys their own copy into their own F
 
 ## Setup and deploy
 
-Authors run `./setup.sh` (made for Google Cloud Shell; see `README.md`). It:
+Authors set up and update their site from the **Galleyleaf setup page** (`https://galleyleaf.web.app/setup/`, private repo `galleyleaf/hub`). It runs the steps below from the browser through Google's APIs, deploying the files of the **latest GitHub release** of this repo. `./setup.sh` does the same from a terminal (made for Google Cloud Shell) and is the path for developers. It:
 1. signs in to Firebase
 2. asks for the title, admin email, project and region, and saves the answers to `book.config.json` right away
 3. uses a project the author created in the Firebase console, chosen from `projects:list`. Creating it there is how the author accepts Firebase's terms; `projects:create` from the CLI fails with a 403 for accounts that haven't. It then creates the `(default)` Standard database and a web app, skipping whatever already exists.
@@ -93,11 +93,13 @@ Authors run `./setup.sh` (made for Google Cloud Shell; see `README.md`). It:
 
    | File | What it holds | Deployed? |
    |---|---|---|
-   | `site.json` | `{ownerEmail}` | Yes, read by `js/auth.js` |
+   | `site.json` | `{ownerEmailHash}`: SHA-256 of the lowercased owner email | Yes, read by `js/auth.js` |
    | `firestore.deploy.rules` | `firestore.rules` with `__OWNER_EMAIL__` filled in | Deployed as the rules |
    | `firebase.deploy.json` | `firebase.json` with the title, support email and the generated rules path | No, it's the deploy config |
 
-5. deploys auth, rules and hosting with `--config firebase.deploy.json`
+5. deploys auth, rules and hosting with `--config firebase.deploy.json`, and a release message that records the settings as JSON: `{"galleyleaf": "<version>", "title", "ownerEmail", "location"}`. The setup page reads the latest release's message to recognise a Galleyleaf site and prefill its update form, so **both must keep writing it in this shape**.
+
+**Releasing a version:** tag `main` as `vX.Y.Z` and publish a GitHub release (`gh release create vX.Y.Z --generate-notes`). Authors get it the next time they click **Update my site** on the setup page. Keep `firebase.json`'s `hosting.ignore` and `headers` simple globs: the setup page reads them to decide which files to upload.
 
 **Other runs:**
 - **Running it again redeploys with the saved answers.** Updating is `git pull && ./setup.sh`.
