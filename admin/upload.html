@@ -20,15 +20,16 @@
       <a href="upload.html" aria-current="page">Publish the book</a>
     </nav>
     <h1>Publish the book</h1>
-    <p>Choose the book’s Markdown file. It’s split into chapters and paragraphs in your browser, then saved to Firestore, where only approved readers can open it. Publishing again replaces the current text. Readers’ comments are tied to paragraph numbers, so they may point to different paragraphs if you add or remove paragraphs.</p>
+    <p>Choose the book’s Word (.docx) or Markdown file. It’s split into chapters and paragraphs in your browser, then saved to Firestore, where only approved readers can open it. Publishing again replaces the current text. Readers’ comments are tied to paragraph numbers, so they may point to different paragraphs if you add or remove paragraphs.</p>
 
     <p class="status" id="status">Checking your account…</p>
 
     <div id="tools" hidden>
       <label class="file-drop">
-        <strong>Book file (.md)</strong>
-        <input type="file" id="file" accept=".md,.markdown,text/markdown,text/plain">
+        <strong>Book file (.docx or .md)</strong>
+        <input type="file" id="file" accept=".docx,.md,.markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain">
       </label>
+      <p class="hint">In a Word file, each chapter starts with a paragraph in the “Heading 1” style, and the book’s title uses the “Title” style. A line of only <code>***</code> or <code>#</code> marks a scene break. Italic and bold are kept. A “Heading 1” called “Dedication” becomes the dedication.</p>
     </div>
 
     <section id="preview" hidden>

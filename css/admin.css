@@ -109,6 +109,8 @@
 /* Publish page */
 .file-drop { display: grid; gap: 0.5rem; padding: 1.25rem; border: 1px dashed var(--line); border-radius: 14px; background: var(--surface); }
 .file-drop input { font: inherit; max-width: 100%; }
+.hint { margin-top: 0.75rem; font-size: 0.875rem; color: var(--muted); }
+.hint code { font-size: 0.95em; padding: 0 0.25em; border-radius: 4px; background: var(--line); color: var(--ink); }
 .summary { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
 .summary th, .summary td { text-align: left; padding: 0.55rem 0.25rem; border-bottom: 1px solid var(--line); }
 .summary td:not(:first-child), .summary th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }

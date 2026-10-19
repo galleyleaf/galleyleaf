@@ -19,6 +19,7 @@
       "firebase.json",
       "firestore.rules",
       "book.md",
+      "**/*.docx",
       "CLAUDE.md",
       "README.md",
       "LICENSE",

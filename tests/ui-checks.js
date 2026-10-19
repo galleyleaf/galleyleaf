@@ -147,6 +147,15 @@ async (page) => {
     await wait(300);
     check("Approving moves the reader to approved", (await page.locator("#pending-list li").count()) === 0);
 
+    /* ---------- Publishing from a Word file ---------- */
+    await open("admin/upload.html");
+    const docx = await page.request.fetch(`${BASE}/tests/fixtures/sample-book.docx`);
+    await page.locator("#file").setInputFiles({ name: "sample-book.docx", mimeType: "application/octet-stream", buffer: await docx.body() });
+    await wait(500);
+    const docxRows = await page.locator("#preview-rows tr").allTextContents();
+    check("A .docx file is split into its chapters", docxRows.length === 3 && docxRows[0].startsWith("Chapter 1"), docxRows.join(" | "));
+    check("A .docx file keeps its title and scene breaks", (await text("#preview-title")) === "The Lamplighter’s Almanac" && docxRows[1].endsWith("1"), `${await text("#preview-title")} | ${docxRows[1]}`);
+
     /* ---------- First sign-in on an admin page ---------- */
     const firstSignIn = async (ownerEmail) => {
       const ownerEmailHash = await page.evaluate(async (email) => {

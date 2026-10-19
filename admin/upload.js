@@ -1,4 +1,4 @@
-// Admin-only: parse book.md in the browser and publish it to Firestore.
+// Admin-only: parse book.md or a .docx in the browser and publish it to Firestore.
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
   collection,
@@ -10,6 +10,7 @@ import {
 import { auth, db } from "../js/firebase.js";
 import { ensureProfile, signIn, whenRulesReady } from "../js/auth.js";
 import { parseBook } from "../js/md-parser.js";
+import { parseDocx } from "../js/docx-parser.js";
 
 const $ = (id) => document.getElementById(id);
 let parsed = null;
@@ -50,18 +51,27 @@ $("file").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   $("preview").hidden = true;
   if (!file) return;
+  const isDocx = /\.docx$/i.test(file.name);
   try {
-    parsed = parseBook(await file.text());
+    parsed = isDocx ? await parseDocx(await file.arrayBuffer(), file.name) : parseBook(await file.text());
   } catch {
-    status("This file couldn’t be read as Markdown.", true);
+    parsed = null;
+    status(isDocx ? "This file couldn’t be read as a Word document. Save it as .docx (not .doc) and try again." : "This file couldn’t be read as Markdown.", true);
     return;
   }
   if (!parsed.sections.length) {
-    status("No chapters found. Chapters must start with a line like “# Chapter 1”.", true);
+    parsed = null;
+    status(
+      isDocx
+        ? "No chapters found. Each chapter must start with a heading in Word’s “Heading 1” style."
+        : "No chapters found. Chapters must start with a line like “# Chapter 1”.",
+      true
+    );
     return;
   }
   const tooBig = parsed.sections.find((s) => JSON.stringify(s.paragraphs).length > 900_000);
   if (tooBig) {
+    parsed = null;
     status(`“${tooBig.title}” is too large to store in one document. Split it into smaller chapters.`, true);
     return;
   }

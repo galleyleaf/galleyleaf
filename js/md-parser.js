@@ -2,9 +2,9 @@
 // Supported: YAML front matter (title, author), ::: fenced divs (copyright, dedication),
 // "# " headings as sections, "---" scene breaks, _italic_ / *italic* and **bold**.
 
-const PLACEHOLDER = /^\[[A-Z0-9 _-]+\]$/;
+export const PLACEHOLDER = /^\[[A-Z0-9 _-]+\]$/;
 
-function escapeHtml(text) {
+export function escapeHtml(text) {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -19,7 +19,7 @@ export function inlineToHtml(text) {
     .replace(/(^|[^\w])_([^_\n]+?)_(?=[^\w]|$)/g, "$1<em>$2</em>");
 }
 
-function slugify(title, used) {
+export function slugify(title, used) {
   const base =
     title
       .toLowerCase()
@@ -127,10 +127,13 @@ export function parseBook(markdown) {
   }
   flush();
 
-  // Drop sections that contain only an unfilled placeholder such as "[ACKNOWLEDGMENTS]".
+  return dropEmptySections(book);
+}
+
+// Drops sections that are empty or contain only an unfilled placeholder such as "[ACKNOWLEDGMENTS]".
+export function dropEmptySections(book) {
   book.sections = book.sections
     .filter((s) => s.paragraphs.length && !s.paragraphs.every((p) => /^\[[^\]]+\]( \[[^\]]+\])*$/.test(p)))
     .map((s, order) => ({ ...s, order }));
-
   return book;
 }

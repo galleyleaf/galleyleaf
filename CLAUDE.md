@@ -31,7 +31,7 @@ This is the public template. Each author deploys their own copy into their own F
   - `hasOnly` schemas and size limits
   - timestamps checked against `request.time`
 - **Use `frontend-design:frontend-design` for UI and visual changes.**
-- **An author's manuscript (`book.md`) is never deployed or committed here.** Readers get the text from Firestore, where security rules protect it.
+- **An author's manuscript (`book.md`, or a `.docx`) is never deployed or committed here.** Readers get the text from Firestore, where security rules protect it.
 - **Run the UI tests after changes and before deploying** (see Testing).
 - **It must run on Firebase's free Spark plan.** Authors deploy into their own accounts at no cost. Don't add anything that needs Blaze (Cloud Functions included) or another paid cloud service.
 - **No personal or project-specific data in this repo.** No real Firebase config, emails or manuscripts. `js/firebase-config.js` and `firebase.json` keep their `REPLACE_ME` placeholders, and `firestore.rules` keeps `__OWNER_EMAIL__`.
@@ -52,7 +52,7 @@ This is the public template. Each author deploys their own copy into their own F
   - Only its author and admins can read it.
   - Only the author can create or edit it, and only while approved. The author or an admin can delete it.
   - The comment icon changes colour when the paragraph has comments.
-- **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` in the browser.
+- **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser.
 - **Two reading views:** the reader switches between them with the top-bar toggle, and the choice is saved.
   - **Paragraph view** shows one paragraph at a time, with Prev/Next, swipe and ←/→.
   - **Scroll view** shows the whole chapter, and the paragraph at the reading line (35% down the viewport) is highlighted. Comments and bookmarks still attach to that paragraph.
@@ -82,6 +82,15 @@ This is the public template. Each author deploys their own copy into their own F
 - Each `# Heading` starts a section, and its id is a slug of the heading (`chapter-1`, `epilogue`). Sections that are still `[PLACEHOLDER]` text are skipped.
 - A blank line separates paragraphs. A `---` line marks a scene break. `_x_` or `*x*` makes italics, and `**x**` makes bold.
 - After editing the book, republish it from `/admin/upload.html`.
+
+## Book format (`.docx`)
+
+`js/docx-parser.js` unzips the file with `DecompressionStream` and reads its XML with `DOMParser`, so it needs no library. It returns the same shape as `parseBook()` and shares its slugs and placeholder rule.
+- Styles are matched by name through `styles.xml`, not by id, so Word in other languages works. An outline level of 0 also counts as Heading 1.
+- **Heading 1** starts a section, and text before the first one is skipped. A Heading 1 called "Dedication" becomes the dedication.
+- **Title** gives the title, and **Author**, or a **Subtitle** like "by Jane Doe", gives the author. The fallbacks are `dc:title` and `dc:creator` in `docProps/core.xml`, and generic creators such as "Microsoft Office User" are ignored.
+- Scene breaks are a paragraph of only `*`, `#`, `~` or dashes, a horizontal-line shape, an empty paragraph with a border, or a bottom border on a paragraph (what Word draws for a typed `---`).
+- Italic and bold come from direct formatting, character styles (including Emphasis and Strong) and paragraph styles. Deleted tracked changes and table-of-contents paragraphs are skipped.
 
 - **Right after setup, the site waits for its security rules.** Rules published through the API can take several minutes to reach a new database, which refuses everything until then. A refused read of the user's **own** profile can only mean that, so `whenRulesReady()` and `watchAccess()` in `js/auth.js` retry for up to 10 minutes. Meanwhile the reader shows "Your site is getting ready" (the `starting` state) and the admin pages say the same in their status line.
 
@@ -124,7 +133,7 @@ npx -y firebase-tools@latest deploy --only firestore:rules --dry-run --project <
 Hosting serves the project root and ignores:
 - the deploy settings: `firebase.json`, `firebase.deploy.json`, `firestore.rules` and `firestore.deploy.rules`
 - `setup.sh` and `book.config.json`
-- `book.md`
+- `book.md` and any `.docx`
 - the docs: `CLAUDE.md`, `README.md` and `LICENSE`
 - `tests/**`, `docs/**` and dotfiles
 
@@ -132,11 +141,12 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 38 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 40 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in, and removed and restored access
 - both reading views
 - comments, bookmarks and chapter completion
 - the admin page, including a first sign-in that happens there
+- reading a `.docx` on the publish page (`tests/fixtures/sample-book.docx`, made from the sample manuscript with `pandoc`)
 - waiting for the security rules right after setup
 
 The test swaps the gstatic Firebase files for the mock in `tests/mock/`, which builds the book from `tests/fixtures/sample-book.md`, a short original sample manuscript. It keeps users and comments in memory and runs no security rules, so it never touches the real project. The mock's test hooks are:
@@ -160,10 +170,11 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 | `js/storage.js` | `localStorage` progress, bookmarks and preferences |
 | `js/celebrate.js` | Confetti animation |
 | `js/md-parser.js` | Turns `book.md` into sections and paragraphs (used by the upload page and the test mock) |
+| `js/docx-parser.js` | Turns a Word `.docx` into the same sections and paragraphs (used by the upload page) |
 | `js/firebase.js`, `js/firebase-config.js` | Firebase init (config from Hosting's `init.json`; the file is a local-preview fallback) |
 | `setup.sh` | Creates, configures and deploys an author's project (see Setup and deploy) |
 | `admin/index.html`, `admin/admin.js` | Readers (remove or restore access) and all comments |
-| `admin/upload.html`, `admin/upload.js` | Publishes `book.md` to Firestore |
+| `admin/upload.html`, `admin/upload.js` | Publishes `book.md` or a `.docx` to Firestore |
 | `css/admin.css` | Styles shared by the admin pages |
 | `firestore.rules`, `firebase.json` | Security rules; hosting, auth and Firestore config |
 | `tests/` | Mock Firebase SDK, sample manuscript, UI checks and runner |

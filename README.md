@@ -15,7 +15,7 @@ Setup takes about 10 minutes in your browser: create a project on the Firebase w
 ## What you need
 
 - A Google account with 2-Step Verification turned on (Firebase requires it). Your book's Firebase project will belong to it.
-- Your manuscript as a Markdown file (`.md`). See [Preparing your manuscript](#preparing-your-manuscript).
+- Your manuscript as a Word file (`.docx`) or a Markdown file (`.md`). See [Preparing your manuscript](#preparing-your-manuscript).
 
 ## Set up your book site
 
@@ -56,7 +56,22 @@ From `https://<your-project>.web.app/admin/` you can:
 
 ## Preparing your manuscript
 
-Galleyleaf reads a Markdown file. If you write in Word or Google Docs, export to Markdown (for example with [Pandoc](https://pandoc.org/)).
+Galleyleaf reads a Word file (`.docx`) or a Markdown file (`.md`).
+
+### Word or Google Docs
+
+Save or download the manuscript as `.docx` (in Google Docs: **File › Download › Microsoft Word**). Galleyleaf follows the paragraph styles:
+
+- **Chapters:** each paragraph in the **Heading 1** style starts a chapter. Text before the first one, such as a title page, is skipped.
+- **Title and author:** the paragraph in the **Title** style is the book's title. A **Subtitle** such as "by Jane Doe" gives the author. Without them, the document's title and author properties are used.
+- **Dedication:** a Heading 1 called "Dedication" makes the text under it the dedication.
+- **Scene breaks:** a paragraph of only `***`, `* * *` or `#`, or a horizontal line.
+- **Formatting:** italic and bold are kept. Other formatting, images, footnotes and comments are left out.
+- **Unfinished sections:** a section whose text is still `[PLACEHOLDER]` is skipped.
+
+Old `.doc` files need to be saved as `.docx` first.
+
+### Markdown
 
 ```markdown
 ---
