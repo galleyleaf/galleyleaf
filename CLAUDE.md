@@ -51,7 +51,8 @@ This is the public template. Each author deploys their own copy into their own F
   - Each comment is stored per paragraph at `users/{uid}/comments`.
   - Only its author and admins can read it.
   - Only the author can create or edit it, and only while approved. The author (while approved) or an admin can delete it. A reader whose access is removed can't read or delete their comments until access is restored.
-  - **Daily limit:** each reader can make 300 comment creates and edits per day, counted in `users/{uid}/limits/commentWrites`, which is written in the same batch as the comment and names it. It keeps a script from using up the project's free daily writes. The limit is in both `firestore.rules` and `js/comments.js`.
+  - **Daily limit:** each reader can make 300 comment creates and edits per day, counted in `users/{uid}/limits/commentWrites`, which is written in the same batch as the comment and names it. It bounds how many comments are stored, and so what the admin page reads. The limit is in both `firestore.rules` and `js/comments.js`.
+    - **What it doesn't stop:** a script can still use up the free daily writes, because one batch can write the same comment up to 500 times for one +1. Every write in a batch is checked against the state before the batch, so rules can't tell the copies apart; the Firestore emulator confirmed this. On Spark that means saving fails until the next day and nothing is charged. Closing it fully would need Cloud Functions.
   - The comment icon changes colour when the paragraph has comments.
 - **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser.
 - **Two reading views:** the reader switches between them with the top-bar toggle, and the choice is saved.

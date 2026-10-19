@@ -39,9 +39,12 @@ rules_version = '2';
 //   - windowStart: timestamp (required, server time when the window began)
 //   - commentId: string (required, 1-100 chars, the comment this write counts)
 //   - updatedAt: timestamp (required, server time on every write)
-//   Caps how many comment writes one reader can make per day, so a script can't
-//   use up the project's free daily write quota. A write either adds 1 within
-//   the window, or, a day after windowStart, starts a new window at 1.
+//   Caps how many different comments one reader can create or edit per day, which
+//   bounds stored comments and what the admin page reads. A write either adds 1
+//   within the window, or, a day after windowStart, starts a new window at 1.
+//   Limitation: one batch can write the same comment many times for one +1
+//   (each write is checked against the state before the batch), so this does
+//   not stop a script from using up the free daily write quota.
 //   Only the approved owner can read and write it; it is never deleted.
 //
 // Collection: book
