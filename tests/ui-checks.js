@@ -37,6 +37,11 @@ async (page) => {
   });
 
   // Full page load (a hash-only change would not reload the mock).
+  // GitHub's latest release, as the admin pages' version check sees it.
+  await page.context().route("https://api.github.com/**", (route) =>
+    route.fulfill({ json: { tag_name: "v0.3.0", html_url: "https://github.com/galleyleaf/galleyleaf/releases/tag/v0.3.0" } })
+  );
+
   const open = async (path) => {
     await page.goto(`${BASE}/${path}`);
     await page.reload();
@@ -164,19 +169,27 @@ async (page) => {
     await evalPage(() => localStorage.removeItem("mock:quotaUsed"));
 
     /* ---------- Account menu ---------- */
+    const openMenu = () => page.locator(".avatar-btn:visible").click();
+    const menuLinks = async () => (await page.locator(".account-menu:visible a:visible").allTextContents()).map((t) => t.trim());
+    await open("#/read/chapter-1/1");
+    await openMenu();
+    check("The reader's top bar has the account menu", (await menuLinks()).includes("Contents"));
+    await page.keyboard.press("Escape");
     await open("");
-    await page.locator("#btn-account").click();
-    const menuLinks = async () => (await page.locator("#account-menu a:visible").allTextContents()).map((t) => t.trim());
+    await openMenu();
     const libraryLinks = await menuLinks();
-    check("The account menu links to every page for an admin", libraryLinks.join("|") === "Library|Readers and comments|Publish the book", libraryLinks.join("|"));
-    await page.locator("#account-menu").getByRole("link", { name: "Readers and comments" }).click();
+    check("The account menu links to every page for an admin", libraryLinks.join("|") === "Contents|Readers and comments|Publish the book", libraryLinks.join("|"));
+    await evalPage(() => localStorage.setItem("reader:pref:theme", '"dark"'));
+    await page.locator(".account-menu:visible").getByRole("link", { name: "Readers and comments" }).click();
     await wait(900);
     check("The account menu opens the admin page", await visible("#content"));
+    check("Admin pages use the saved theme", await evalPage(() => document.documentElement.dataset.theme === "dark"));
+    await evalPage(() => localStorage.removeItem("reader:pref:theme"));
 
     /* ---------- Admin ---------- */
     await open("admin/");
-    await page.locator("#btn-account").click();
-    check("The admin page has the same account menu", (await menuLinks()).length === 3 && (await text('#account-menu [aria-current="page"]')).trim() === "Readers and comments");
+    await openMenu();
+    check("The admin page has the same account menu", (await menuLinks()).length === 3 && (await text('.account-menu [aria-current="page"]')).trim() === "Readers and comments");
     await page.keyboard.press("Escape");
     check("Admin page lists readers with access removed", (await page.locator("#pending-list li").count()) === 1);
     check("Admin page lists comments", (await page.locator("#comment-list li").count()) >= 1);
@@ -189,6 +202,18 @@ async (page) => {
     await wait(300);
     check("Approving moves the reader to approved", (await page.locator("#pending-list li").count()) === 0);
 
+    /* ---------- Site version ---------- */
+    const withSiteVersion = async (version) => {
+      await page.context().route("**/site.json", (route) => route.fulfill({ json: { version } }));
+      await evalPage(() => localStorage.removeItem("galleyleaf:latestRelease"));
+      await open("admin/");
+      await page.context().unroute("**/site.json");
+    };
+    await withSiteVersion("v0.2.1");
+    check("An outdated site shows the update notice", (await visible("#update-notice")) && (await text("#update-notice")).includes("Galleyleaf v0.3.0 is available. Your site runs v0.2.1.") && (await page.getByRole("link", { name: "Update my site" }).getAttribute("href")) === "https://galleyleaf.web.app/setup/", await text("#update-notice"));
+    await withSiteVersion("v0.3.0");
+    check("An up-to-date site shows its version and no notice", !(await visible("#update-notice")) && (await text("#site-version-text")) === "Galleyleaf v0.3.0. You have the latest version.", await text("#site-version-text"));
+
     /* ---------- Publishing from a Word file ---------- */
     await open("admin/upload.html");
     const docx = await page.request.fetch(`${BASE}/tests/fixtures/sample-book.docx`);
@@ -197,6 +222,17 @@ async (page) => {
     const docxRows = await page.locator("#preview-rows tr").allTextContents();
     check("A .docx file is split into its chapters", docxRows.length === 3 && docxRows[0].startsWith("Chapter 1"), docxRows.join(" | "));
     check("A .docx file keeps its title and scene breaks", (await text("#preview-title")) === "The Lamplighter’s Almanac" && docxRows[1].endsWith("1"), `${await text("#preview-title")} | ${docxRows[1]}`);
+
+    /* ---------- Removing the book ---------- */
+    check("The publish page shows the published book", (await text("#published-summary")).includes("Test Title"), await text("#published-summary"));
+    await evalPage(() => { window.confirm = () => true; });
+    await page.getByRole("button", { name: "Remove the book" }).click();
+    await wait(300);
+    check("Removing the book leaves nothing published", (await text("#published-summary")).startsWith("No book is published") && !(await visible("#btn-remove")), await text("#published-summary"));
+    await open("");
+    check("Readers see that the book isn't published", (await text("#library-message-text")).includes("hasn’t been published"), await text("#library-message-text"));
+    check("Without a book, Contents shows only a link to publish it", !(await visible("#chapter-list")) && !(await visible("#bookmark-list")) && (await page.locator("#library-publish").getAttribute("href")) === "admin/upload.html" && (await visible("#library-publish")));
+    await evalPage(() => localStorage.removeItem("mock:noBook"));
 
     /* ---------- First sign-in on an admin page ---------- */
     const firstSignIn = async (ownerEmail) => {

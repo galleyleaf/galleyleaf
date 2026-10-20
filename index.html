@@ -6,8 +6,9 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#EDF0F5" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0F1428" media="(prefers-color-scheme: dark)">
-  <title>Book Reader</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2318203A'/%3E%3Cpath d='M16 6l2.4 7.6L26 16l-7.6 2.4L16 26l-2.4-7.6L6 16l7.6-2.4z' fill='%23E2B652'/%3E%3C/svg%3E">
+  <title>Galleyleaf Reader</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
@@ -19,6 +20,7 @@
   <link rel="modulepreload" href="js/app.js">
   <link rel="modulepreload" href="js/auth.js">
   <link rel="modulepreload" href="js/account-menu.js">
+  <link rel="modulepreload" href="js/theme.js">
   <link rel="modulepreload" href="js/book.js">
   <link rel="modulepreload" href="js/reader.js">
   <link rel="modulepreload" href="js/comments.js">
@@ -30,6 +32,7 @@
 <body>
   <svg class="sprite" aria-hidden="true">
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3L12 21.5l-2.3-7.2L2.5 12l7.2-2.3z" fill="currentColor"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M12 2C19 5.2 21.6 11.6 12 19C2.4 11.6 5 5.2 12 2zM11.35 4.4V17.6h1.3V4.4z" fill="currentColor" fill-rule="evenodd"/><path d="M12 19c0 1.3-.5 2.2-1.8 2.8" fill="none" stroke-width="1.6" stroke-linecap="round" style="stroke: var(--leaf-stem, currentColor)"/></symbol>
     <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="M19 12H5m6-6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 12h14m-6-6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -47,7 +50,7 @@
 
   <!-- Loading -->
   <section id="view-loading" class="view view-center" aria-busy="true">
-    <svg class="loader" aria-hidden="true"><use href="#i-star"/></svg>
+    <svg class="loader" aria-hidden="true"><use href="#i-leaf"/></svg>
     <p class="visually-hidden">Loading</p>
     <p class="loading-message" id="loading-message" hidden>Your site is getting ready. Right after setup this can take a few minutes. It opens by itself.</p>
   </section>
@@ -55,8 +58,8 @@
   <!-- Sign in -->
   <section id="view-login" class="view view-center" hidden>
     <div class="gate">
-      <svg class="gate-mark" aria-hidden="true"><use href="#i-star"/></svg>
-      <h1 class="gate-title" data-book-title>Book Reader</h1>
+      <svg class="gate-mark" aria-hidden="true"><use href="#i-leaf"/></svg>
+      <h1 class="gate-title" data-book-title>Galleyleaf Reader</h1>
       <p class="gate-lede">Sign in with Google to request access to the book.</p>
       <button type="button" class="btn btn-google" id="btn-sign-in">
         <svg aria-hidden="true"><use href="#i-google"/></svg>
@@ -70,10 +73,10 @@
   <section id="view-pending" class="view view-center" hidden>
     <div class="gate">
       <div class="pending-orbit" aria-hidden="true">
-        <svg><use href="#i-star"/></svg>
+        <svg><use href="#i-leaf"/></svg>
       </div>
       <h1 class="gate-title gate-title-sm">Your access to the book is paused</h1>
-      <p class="gate-lede">You’re signed in as <strong id="pending-email"></strong>. An admin has paused access for this account. If it’s turned back on, the library opens here automatically.</p>
+      <p class="gate-lede">You’re signed in as <strong id="pending-email"></strong>. An admin has paused access for this account. If it’s turned back on, the book opens here automatically.</p>
       <button type="button" class="btn btn-quiet" data-action="sign-out">Sign out</button>
     </div>
   </section>
@@ -94,35 +97,20 @@
   <section id="view-library" class="view" hidden>
     <header class="topbar">
       <span class="topbar-brand">
-        <svg aria-hidden="true"><use href="#i-star"/></svg>
-        <span data-book-title>Book Reader</span>
+        <svg aria-hidden="true"><use href="#i-leaf"/></svg>
+        <span data-book-title>Galleyleaf Reader</span>
       </span>
       <div class="topbar-actions">
         <button type="button" class="icon-btn" data-action="toggle-theme" aria-label="Switch to dark theme">
           <svg class="when-light" aria-hidden="true"><use href="#i-moon"/></svg>
           <svg class="when-dark" aria-hidden="true"><use href="#i-sun"/></svg>
         </button>
-        <div class="account" id="account">
-          <button type="button" class="avatar-btn" id="btn-account" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu" aria-label="Account">
-            <img id="avatar-img" alt="" referrerpolicy="no-referrer" hidden>
-            <span id="avatar-initial" aria-hidden="true"></span>
-          </button>
-          <div class="account-menu" id="account-menu" hidden>
-            <p class="account-name" id="account-name"></p>
-            <p class="account-email" id="account-email"></p>
-            <nav class="menu-nav" aria-label="Pages">
-              <a class="menu-link" href="#/" aria-current="page">Library</a>
-              <a class="menu-link" href="admin/" data-admin-only hidden>Readers and comments</a>
-              <a class="menu-link" href="admin/upload.html" data-admin-only hidden>Publish the book</a>
-            </nav>
-            <button type="button" class="menu-link" id="btn-sign-out">Sign out</button>
-          </div>
-        </div>
+        <div class="account" data-account-menu data-current="contents" hidden></div>
       </div>
     </header>
 
     <main class="library" id="library">
-      <div class="library-hero">
+      <div class="library-hero" data-book-only>
         <h1 class="book-title" data-book-title></h1>
         <p class="book-author" id="book-author"></p>
         <p class="book-dedication" id="book-dedication" hidden></p>
@@ -135,14 +123,17 @@
         <span class="continue-bar"><span id="continue-fill"></span></span>
       </a>
 
-      <p class="library-message" id="library-message" hidden></p>
+      <div class="library-message" id="library-message" hidden>
+        <p id="library-message-text"></p>
+        <a class="btn btn-primary" href="admin/upload.html" id="library-publish" hidden>Publish the book</a>
+      </div>
 
-      <section class="library-section" aria-labelledby="chapters-heading">
+      <section class="library-section" aria-labelledby="chapters-heading" data-book-only>
         <h2 id="chapters-heading">Chapters</h2>
         <ol class="chapter-list" id="chapter-list"></ol>
       </section>
 
-      <section class="library-section" aria-labelledby="bookmarks-heading">
+      <section class="library-section" aria-labelledby="bookmarks-heading" data-book-only>
         <h2 id="bookmarks-heading">Bookmarks</h2>
         <ul class="bookmark-list" id="bookmark-list"></ul>
         <p class="empty" id="bookmarks-empty">Tap the bookmark button while reading to save a paragraph here.</p>
@@ -169,6 +160,7 @@
           <svg class="when-light" aria-hidden="true"><use href="#i-moon"/></svg>
           <svg class="when-dark" aria-hidden="true"><use href="#i-sun"/></svg>
         </button>
+        <div class="account" data-account-menu hidden></div>
       </div>
     </header>
 

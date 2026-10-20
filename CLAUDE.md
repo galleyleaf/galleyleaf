@@ -54,8 +54,10 @@ This is the public template. Each author deploys their own copy into their own F
   - **Daily limit:** each reader can make 300 comment creates and edits per day, counted in `users/{uid}/limits/commentWrites`, which is written in the same batch as the comment and names it. It bounds how many comments are stored, and so what the admin page reads. The limit is in both `firestore.rules` and `js/comments.js`.
     - **What it doesn't stop:** a script can still use up the free daily writes, because one batch can write the same comment up to 500 times for one +1. Every write in a batch is checked against the state before the batch, so rules can't tell the copies apart; the Firestore emulator confirmed this. On Spark that means saving fails until the next day and nothing is charged. Closing it fully would need Cloud Functions.
   - The comment icon changes colour when the paragraph has comments.
-- **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser.
-- **Account menu:** the avatar opens one menu on the library and both admin pages. It shows who is signed in, links to Library, Readers and comments, and Publish the book (the admin links only for admins), and has Sign out. The markup is repeated in each page, and `js/account-menu.js` runs it. The reader's theme, text size and view buttons stay as icons in the top bars.
+- **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser. That page also shows the published book and can remove it: one batch deletes `book/meta` and every chapter, readers' comments are kept, and readers see that the book isn't published yet.
+- **Contents page with no book:** it hides the title, chapters and bookmarks and shows only a message. Admins also get a "Publish the book" button there.
+- **Top bar and account menu:** Contents and both admin pages share one top bar: the book title (linking to Contents), the theme button and the avatar. The reader's top bar has the back arrow, chapter title, view, text size and theme buttons, and the avatar too. The avatar opens the same menu everywhere: who is signed in, links to Contents, Readers and comments, and Publish the book (the admin links only for admins), and Sign out. Pages hold an empty `<div class="account" data-account-menu>` with `data-root` and `data-current`, and `js/account-menu.js` builds the menu into each one, so its markup lives in one place.
+- **Theme:** `js/theme.js` applies the saved theme (`reader:pref:theme`, else the system's) and handles every theme button, on the reader and the admin pages alike.
 - **Two reading views:** the reader switches between them with the top-bar toggle, and the choice is saved.
   - **Paragraph view** shows one paragraph at a time, with Prev/Next, swipe and ←/→.
   - **Scroll view** shows the whole chapter, and the paragraph at the reading line (35% down the viewport) is highlighted. Comments and bookmarks still attach to that paragraph.
@@ -68,8 +70,9 @@ This is the public template. Each author deploys their own copy into their own F
   - A watermark and stopping the `sessionStorage` chapter cache were considered and not done.
 - **Chapter completion:** shows a confetti and check celebration, which is skipped when the reader prefers reduced motion.
 - **Loading:** `index.html` has `modulepreload` links for every module the reader page imports, so they download in parallel. Add a link when you add a module to that import graph. The admin pages don't use preloads.
-- **Caching:** JS and CSS are served with `Cache-Control: no-cache`, so deploys show up immediately.
+- **Caching:** HTML pages, JS, CSS and JSON (`site.json`) are served with `Cache-Control: no-cache`, so browsers check for a newer copy every time and deploys show up immediately. Without it Firebase Hosting sends `max-age=3600`, and a cached old page could run with newer scripts. Images and icons keep that one-hour default.
 - **Security headers:** HTML pages (`**/*.html`, `/` and `/admin/`) get a Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff` and a `Referrer-Policy`. They're set on pages only, because `frame-ancestors` on Firebase's `/__/auth/` pages would break popup sign-in. When you load something from a new origin, add it to the CSP in all three header blocks of `firebase.json`; the UI tests apply the CSP and fail on anything it blocks.
+- **Version and updates:** both admin pages show the site's version (from `site.json`) in a footer with a link to the setup page. `js/site-version.js` asks GitHub's API for the latest release of `galleyleaf/galleyleaf`, caches the answer for 6 hours in `localStorage`, and shows an "Update my site" notice when it's newer. Sites deployed before v0.2.2 have no version in `site.json`, so they show "an earlier version". Updating itself happens on the setup page.
 - **Admin page reads:** it subscribes to every comment, which is fine at a beta-reader scale. Paging it would need `orderBy` on a collection-group query, which needs an index the setup page doesn't deploy. Excerpts are fetched only for chapters in `book/meta`, since a comment's `chapterId` is chosen by the reader.
 
 ## Data model (Firestore)
@@ -110,11 +113,13 @@ Authors set up and update their site from the **Galleyleaf setup page** (`https:
 
    | File | What it holds | Deployed? |
    |---|---|---|
-   | `site.json` | `{ownerEmailHash}`: SHA-256 of the lowercased owner email | Yes, read by `js/auth.js` |
+   | `site.json` | `{ownerEmailHash, version}`: SHA-256 of the lowercased owner email, and the Galleyleaf version (`git describe --tags`) | Yes, read by `js/auth.js` and `js/site-version.js` |
    | `firestore.deploy.rules` | `firestore.rules` with `__OWNER_EMAIL__` filled in | Deployed as the rules |
    | `firebase.deploy.json` | `firebase.json` with the title, support email and the generated rules path | No, it's the deploy config |
 
-5. deploys auth, rules and hosting with `--config firebase.deploy.json`, and a release message that records the settings as JSON: `{"galleyleaf": "<version>", "title", "ownerEmail", "location"}`. The setup page reads the latest release's message to recognise a Galleyleaf site and prefill its update form, so **both must keep writing it in this shape**.
+5. deploys auth, rules and hosting with `--config firebase.deploy.json`, and a release message that records the settings as JSON: `{"galleyleaf": "<version>", "title", "ownerEmail", "location"}`. The setup page reads the latest release's message to recognise a Galleyleaf site and prefill its update form, so **both must keep writing it in this shape**. Both also write `version` into `site.json`.
+
+**Merging to `main`:** always squash a branch into one commit (`git merge --squash`, or squash and merge on a pull request), so `main` gets one commit per change.
 
 **Releasing a version:** tag `main` as `vX.Y.Z` and publish a GitHub release (`gh release create vX.Y.Z --generate-notes`). Authors get it the next time they click **Update my site** on the setup page. Keep `firebase.json`'s `hosting.ignore` and `headers` simple globs: the setup page reads them to decide which files to upload.
 
@@ -148,10 +153,12 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 46 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 54 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in, and removed and restored access
 - both reading views
 - comments (including the daily limit), bookmarks and chapter completion
+- the account menu, and removing the published book
+- the version footer and the update notice (GitHub's API is answered by the test)
 - the admin page, including a first sign-in that happens there
 - reading a `.docx` on the publish page (`tests/fixtures/sample-book.docx`, made from the sample manuscript with `pandoc`)
 - waiting for the security rules right after setup
@@ -163,6 +170,7 @@ The test swaps the gstatic Firebase files for the mock in `tests/mock/`, which b
 - `localStorage["mock:fresh"] = "1"` starts with no profile, as on a first sign-in.
 - `localStorage["mock:notReady"] = "N"` refuses the first N profile reads with `permission-denied`, as before new rules arrive.
 - `localStorage["mock:quotaUsed"] = "N"` starts the reader's daily comment count at N.
+- `localStorage["mock:noBook"] = "1"` means no book is published. Removing the book on the publish page sets it.
 
 When you change UI labels or ids, update `tests/ui-checks.js`. The security rules themselves are untested; the Firebase Emulator Suite would be the way to test them.
 
@@ -171,12 +179,15 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 | Path | Purpose |
 |---|---|
 | `index.html`, `css/styles.css` | App shell, SVG icon sprite, all views and styles |
+| `icon.svg`, `apple-touch-icon.png` | Site icon (favicon) and the 180px home-screen icon, linked from all three pages |
 | `js/app.js` | Access gate, hash routing (`#/`, `#/read/{chapterId}/{p}`), library, theme and text size |
 | `js/auth.js` | Google sign-in (popup with redirect fallback), profile creation, access watcher |
 | `js/book.js` | Loads `book/meta` and chapters, cached in memory and `sessionStorage` |
 | `js/reader.js` | Both reading views, bookmarks, comment sheet, chapter completion |
 | `js/comments.js` | Comment reads and writes |
 | `js/account-menu.js` | The avatar menu shared by the reader and the admin pages |
+| `js/theme.js` | Light and dark theme, shared by the reader and the admin pages |
+| `js/site-version.js` | The admin pages' version footer and update notice |
 | `js/storage.js` | `localStorage` progress, bookmarks and preferences |
 | `js/celebrate.js` | Confetti animation |
 | `js/md-parser.js` | Turns `book.md` into sections and paragraphs (used by the upload page and the test mock) |
@@ -193,6 +204,7 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 ## Design
 
 - **Look:** dawn-blue paper, indigo ink and a gold star accent.
+- **Icon:** an open book shaped like a leaf (the spine is the midrib) with a gold stem, on an indigo tile. Inside the pages the same leaf is the logo: the `i-leaf` sprite symbol (ink leaf, `--leaf-stem` gold stem) marks the top-bar brand, the sign-in screen, the loading pulse and the access-paused orbit. Gold stars stay as the accent inside the book: the progress marker, scene breaks and the completion confetti. With no book title, pages say "Galleyleaf Reader". `apple-touch-icon.png` is `icon.svg` with square corners, since phones round them, rendered at 180px.
 - **Typefaces:** Spectral for reading text and Instrument Sans for the UI.
 - **Colours:** colour tokens live on `:root` in `css/styles.css`, with light and dark themes.
 - **Layout:** mobile-first, with breakpoints at 600px and 960px.
@@ -203,6 +215,5 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 - **"Open in Cloud Shell" button and `setup.sh`: done.**
 - **Still to come for setup:**
   - a Cloud Shell side-panel tutorial
-  - an admin-page banner when a newer version is available
 - **The Galleyleaf mobile app:** it will let readers open approved books from their phone.
   - Each book's site will gain a `reader.json`, an app sign-in page, email-link sign-in, and an "Available in the app" switch on the admin page.

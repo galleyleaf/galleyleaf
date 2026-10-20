@@ -1,6 +1,7 @@
-// App shell: access gate, routing, library screen, theme and text size.
+// App shell: access gate, routing, library screen and text size.
 import { signIn, signOut, watchAccess } from "./auth.js";
 import { renderAccount } from "./account-menu.js";
+import "./theme.js";
 import { clearBookCache, loadMeta } from "./book.js";
 import { closeReader, initReader, openChapter } from "./reader.js";
 import {
@@ -46,29 +47,13 @@ function showError(title, message) {
   show("error");
 }
 
-/* ---------- Theme and text size ---------- */
-
-function effectiveTheme() {
-  const set = document.documentElement.dataset.theme;
-  if (set) return set;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
-function applyTheme(theme) {
-  if (theme) document.documentElement.dataset.theme = theme;
-  else delete document.documentElement.dataset.theme;
-  const label = effectiveTheme() === "dark" ? "Switch to light theme" : "Switch to dark theme";
-  document.querySelectorAll('[data-action="toggle-theme"]').forEach((b) => b.setAttribute("aria-label", label));
-}
+/* ---------- Text size ---------- */
 
 function applyTextSize(size) {
   document.documentElement.dataset.size = String(size);
 }
 
-applyTheme(getPref("theme", null));
 applyTextSize(getPref("textSize", 1));
-
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme(getPref("theme", null)));
 
 $("btn-text-size").addEventListener("click", () => {
   const size = (getPref("textSize", 1) + 1) % TEXT_SIZES;
@@ -81,13 +66,7 @@ $("btn-text-size").addEventListener("click", () => {
 
 document.addEventListener("click", (e) => {
   const action = e.target.closest("[data-action]")?.dataset.action;
-  if (action === "sign-out") {
-    signOut();
-  } else if (action === "toggle-theme") {
-    const theme = effectiveTheme() === "dark" ? "light" : "dark";
-    setPref("theme", theme);
-    applyTheme(theme);
-  }
+  if (action === "sign-out") signOut();
 });
 
 $("btn-sign-in").addEventListener("click", async () => {
@@ -127,17 +106,26 @@ async function renderLibrary() {
   try {
     meta = await loadMeta();
   } catch (error) {
+    // Without a book there is nothing to list: show only the message, and
+    // send admins to the publish page.
+    const missing = error.message === "book-missing";
+    const isAdmin = access.profile?.admin === true;
+    document.querySelectorAll("[data-book-only]").forEach((n) => (n.hidden = true));
+    $("continue-card").hidden = true;
     $("chapter-list").replaceChildren();
     message.hidden = false;
-    message.textContent =
-      error.message === "book-missing"
-        ? "The book hasn’t been published yet. Check back soon."
-        : "The library couldn’t be loaded. Check your connection, then reload the page.";
+    $("library-message-text").textContent = !missing
+      ? "The book couldn’t be loaded. Check your connection, then reload the page."
+      : isAdmin
+        ? "The book hasn’t been published yet. Publish it to let readers start reading."
+        : "The book hasn’t been published yet. Check back soon.";
+    $("library-publish").hidden = !(missing && isAdmin);
     return;
   }
   message.hidden = true;
+  document.querySelectorAll("[data-book-only]").forEach((n) => (n.hidden = false));
 
-  setBookTitle(meta.title || "Book Reader");
+  setBookTitle(meta.title || "Galleyleaf Reader");
   $("book-author").textContent = meta.author ? `by ${meta.author}` : "";
   const dedication = $("book-dedication");
   dedication.hidden = !meta.dedication;

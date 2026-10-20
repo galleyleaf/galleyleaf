@@ -202,16 +202,20 @@ fi
 # ---------- 6. Your settings files ----------
 
 step "Writing your settings"
+# The Galleyleaf version being deployed. It goes into site.json, where the admin
+# pages read it, and into the release message.
+version=$(git describe --tags --always 2>/dev/null || echo dev)
+
 if [ "$DRY_RUN" = 1 ]; then
   info "[dry run] would write book.config.json, site.json, firestore.deploy.rules and firebase.deploy.json"
 else
-  TITLE="$title" OWNER="$owner" PROJECT="$project" LOCATION="$location" ACCOUNT="$account" node -e '
+  TITLE="$title" OWNER="$owner" PROJECT="$project" LOCATION="$location" ACCOUNT="$account" VERSION="$version" node -e '
     const fs = require("fs");
-    const { TITLE, OWNER, PROJECT, LOCATION, ACCOUNT } = process.env;
+    const { TITLE, OWNER, PROJECT, LOCATION, ACCOUNT, VERSION } = process.env;
     fs.writeFileSync("book.config.json", JSON.stringify(
       { title: TITLE, ownerEmail: OWNER, projectId: PROJECT, location: LOCATION }, null, 2) + "\n");
     const hash = require("crypto").createHash("sha256").update(OWNER.toLowerCase()).digest("hex");
-    fs.writeFileSync("site.json", JSON.stringify({ ownerEmailHash: hash }) + "\n");
+    fs.writeFileSync("site.json", JSON.stringify({ ownerEmailHash: hash, version: VERSION }) + "\n");
     const rules = fs.readFileSync("firestore.rules", "utf8");
     if (!rules.includes("__OWNER_EMAIL__")) throw new Error("firestore.rules has no __OWNER_EMAIL__ placeholder");
     fs.writeFileSync("firestore.deploy.rules", rules.replaceAll("__OWNER_EMAIL__", OWNER));
@@ -230,7 +234,6 @@ step "Deploying your site"
 info "Google sign-in, security rules and the website. This takes a minute or two."
 # The release message records the settings, so the Galleyleaf setup page can
 # recognise this site and offer to update it.
-version=$(git describe --tags --always 2>/dev/null || echo dev)
 message=$(TITLE="$title" OWNER="$owner" LOCATION="$location" VERSION="$version" node -e '
   const { TITLE, OWNER, LOCATION, VERSION } = process.env;
   process.stdout.write(JSON.stringify({ galleyleaf: VERSION, title: TITLE, ownerEmail: OWNER, location: LOCATION }));')

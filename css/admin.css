@@ -1,11 +1,8 @@
 /* Admin pages (approvals, comments, publishing). Builds on styles.css tokens. */
 
-.admin { max-width: 48rem; margin: 0 auto; padding: calc(var(--safe-top) + 1.5rem) var(--gutter) 4rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+.admin { max-width: 48rem; margin: 0 auto; padding: 0.5rem var(--gutter) 4rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
 .admin h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(2.25rem, 9vw, 3rem); line-height: 1.05; }
 .admin > p { color: var(--muted); }
-
-.admin-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.admin-head .account { margin: -4px -6px 0 0; }
 
 .admin-section { display: grid; gap: 0.75rem; }
 .admin-section h2 {
@@ -35,6 +32,22 @@
 .status.is-error { color: var(--danger); }
 
 .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+
+.update-notice {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--gold-soft) 22%, var(--surface));
+}
+.site-version { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.875rem; }
+.site-version a { color: inherit; }
+.site-version a:hover { color: var(--ink); }
+
+.btn-danger { background: transparent; border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 8%, transparent); border-color: var(--danger); }
+#remove-row .hint { flex: 1; min-width: 12rem; }
 
 /* People */
 .people { list-style: none; margin: 0; padding: 0; }

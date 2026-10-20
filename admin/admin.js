@@ -11,6 +11,8 @@ import {
 import { auth, db } from "../js/firebase.js";
 import { ensureProfile, signIn, whenRulesReady } from "../js/auth.js";
 import { renderAccount } from "../js/account-menu.js";
+import { showSiteVersion } from "../js/site-version.js";
+import "../js/theme.js";
 import { loadChapter, loadMeta } from "../js/book.js";
 
 const $ = (id) => document.getElementById(id);
@@ -113,9 +115,11 @@ onAuthStateChanged(auth, async (user) => {
   state.me = user.uid;
   $("status").hidden = true;
   $("content").hidden = false;
+  showSiteVersion();
 
   try {
     const meta = await loadMeta();
+    if (meta.title) document.querySelectorAll("[data-book-title]").forEach((n) => (n.textContent = meta.title));
     meta.chapters.forEach((c) => state.chapters.set(c.id, c));
   } catch {
     /* book not published yet: comments will show chapter ids */

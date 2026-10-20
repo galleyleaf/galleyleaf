@@ -9,6 +9,8 @@
 // - localStorage "mock:fresh" = "1" starts with no profile for u1, as on a
 //   first sign-in, so the app has to create it.
 // - localStorage "mock:quotaUsed" = "N" starts u1's daily comment quota at N writes.
+// - localStorage "mock:noBook" = "1" means no book is published. Removing the
+//   book on the upload page sets it.
 
 const origin = location.origin;
 const { parseBook } = await import(`${origin}/js/md-parser.js`);
@@ -102,6 +104,7 @@ export async function getDoc(ref) {
   if (ref.path.startsWith("users/") && refuse()) throw denied();
   if (ref.path.startsWith("users/")) return { exists: () => !!users[ref.id], data: () => users[ref.id] };
   const book = await bookPromise;
+  if (bookRemoved()) return { exists: () => false, data: () => undefined };
   if (ref.path === "book/meta") {
     return {
       exists: () => true,
@@ -117,7 +120,15 @@ export async function getDoc(ref) {
   return { exists: () => !!section, data: () => section };
 }
 
-export const getDocs = async () => ({ forEach() {}, docs: [] });
+const bookRemoved = () => localStorage.getItem("mock:noBook") === "1";
+
+export async function getDocs(ref) {
+  const book = await bookPromise;
+  const docs = ref.path === "chapters" && !bookRemoved()
+    ? book.sections.map((s) => ({ id: s.id, ref: { path: `chapters/${s.id}`, id: s.id } }))
+    : [];
+  return { docs, forEach: (fn) => docs.forEach(fn) };
+}
 
 /* ---------- Writes ---------- */
 
@@ -156,7 +167,8 @@ export async function deleteDoc(ref) {
   emit(listeners.group);
 }
 
-// Comment and quota writes are applied on commit; others (the upload page) are dropped.
+// Comment and quota writes are applied on commit, and deleting book/meta removes
+// the book (mock:noBook). Other upload-page writes are dropped.
 export const writeBatch = () => {
   const ops = [];
   return {
@@ -165,7 +177,9 @@ export const writeBatch = () => {
       else if (ref.path.includes("/comments/")) myComments.set(ref.id, { ...data, id: ref.id, uid: "u1" });
     }),
     update: (ref, data) => ops.push(() => Object.assign(myComments.get(ref.id), data)),
-    delete() {},
+    delete: (ref) => ops.push(() => {
+      if (ref.path === "book/meta") localStorage.setItem("mock:noBook", "1");
+    }),
     commit: async () => {
       ops.forEach((op) => op());
       emit(listeners.mine);

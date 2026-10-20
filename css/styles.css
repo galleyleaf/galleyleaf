@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Book Reader — mobile-first styles
+   Galleyleaf Reader — mobile-first styles
    Palette: dawn paper + night-indigo ink, with a single gold "star" accent.
    ========================================================================== */
 
@@ -193,8 +193,9 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
 .loader {
   width: 36px;
   height: 36px;
-  color: var(--gold);
-  animation: twinkle 1.4s ease-in-out infinite;
+  color: var(--ink);
+  --leaf-stem: var(--gold);
+  animation: pulse 1.4s ease-in-out infinite;
 }
 
 #view-loading { align-content: center; gap: 20px; }
@@ -206,9 +207,9 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
   color: var(--muted);
 }
 
-@keyframes twinkle {
-  0%, 100% { transform: scale(0.75) rotate(0deg); opacity: 0.5; }
-  50% { transform: scale(1) rotate(45deg); opacity: 1; }
+@keyframes pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.45; }
+  50% { transform: scale(1); opacity: 1; }
 }
 
 .gate {
@@ -220,7 +221,7 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
   gap: 1.25rem;
 }
 
-.gate-mark { width: 40px; height: 40px; color: var(--gold); }
+.gate-mark { width: 40px; height: 40px; color: var(--ink); --leaf-stem: var(--gold); }
 
 .gate-title {
   font-family: var(--serif);
@@ -239,7 +240,7 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
 
 .form-error { color: var(--danger); font-size: 0.9375rem; }
 
-/* Pending: a star slowly orbiting, the only ambient motion in the app */
+/* Pending: a leaf slowly drifting round, the only ambient motion in the app */
 .pending-orbit {
   position: relative;
   width: 72px;
@@ -253,7 +254,8 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
   left: calc(50% - 9px);
   width: 18px;
   height: 18px;
-  color: var(--gold);
+  color: var(--ink);
+  --leaf-stem: var(--gold);
   transform-origin: 9px 45px;
   animation: orbit 6s linear infinite;
 }
@@ -283,7 +285,8 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
   font-weight: 500;
   font-size: 0.9375rem;
 }
-.topbar-brand svg { width: 16px; height: 16px; color: var(--gold); }
+a.topbar-brand { color: inherit; text-decoration: none; }
+.topbar-brand svg { width: 18px; height: 18px; color: var(--ink); --leaf-stem: var(--gold); }
 .topbar-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .topbar-actions { display: flex; align-items: center; gap: 0.25rem; }
@@ -384,6 +387,9 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
 }
 
 .library-message {
+  display: grid;
+  justify-items: start;
+  gap: 1rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -508,6 +514,8 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
 }
 
 .reader-top {
+  position: relative;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 0.25rem;

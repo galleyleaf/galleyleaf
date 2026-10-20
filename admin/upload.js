@@ -3,6 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/f
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   serverTimestamp,
   writeBatch,
@@ -10,20 +11,45 @@ import {
 import { auth, db } from "../js/firebase.js";
 import { ensureProfile, signIn, whenRulesReady } from "../js/auth.js";
 import { renderAccount } from "../js/account-menu.js";
+import { showSiteVersion } from "../js/site-version.js";
+import "../js/theme.js";
+import { clearBookCache } from "../js/book.js";
 import { parseBook } from "../js/md-parser.js";
 import { parseDocx } from "../js/docx-parser.js";
 
 const $ = (id) => document.getElementById(id);
 let parsed = null;
+let published = null;
 
 function status(message, isError = false) {
   const s = $("status");
   s.textContent = message;
   s.classList.toggle("is-error", isError);
+  s.hidden = false;
+}
+
+// Shows what readers can open now, and offers to remove it.
+async function showPublished() {
+  const snap = await getDoc(doc(db, "book", "meta"));
+  published = snap.exists() ? snap.data() : null;
+  if (published?.title) document.querySelectorAll("[data-book-title]").forEach((n) => (n.textContent = published.title));
+  const summary = $("published-summary");
+  if (published) {
+    const chapters = published.chapters?.length || 0;
+    const date = published.updatedAt?.toDate?.().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+    summary.textContent =
+      `“${published.title || "Untitled"}”${published.author ? ` by ${published.author}` : ""}, ` +
+      `${chapters} ${chapters === 1 ? "section" : "sections"}${date ? `, published ${date}` : ""}.`;
+  } else {
+    summary.textContent = "No book is published. Readers see that it isn’t published yet.";
+  }
+  $("remove-row").hidden = !published;
+  $("published").hidden = false;
 }
 
 onAuthStateChanged(auth, async (user) => {
   $("tools").hidden = true;
+  $("published").hidden = true;
   renderAccount(user, null);
   if (!user) {
     status("Sign in with the admin account to publish.");
@@ -43,8 +69,10 @@ onAuthStateChanged(auth, async (user) => {
       status(`${user.email} isn’t an admin. Sign in with the admin email you gave during setup, or in the Firestore console set admin: true and approved: true on users/${user.uid}, then reload this page.`, true);
       return;
     }
-    status(`Signed in as ${user.email}.`);
+    $("status").hidden = true;
     $("tools").hidden = false;
+    showSiteVersion();
+    await showPublished();
   } catch {
     status("Your account couldn’t be checked. Reload the page to try again.", true);
   }
@@ -142,17 +170,42 @@ $("btn-publish").addEventListener("click", async () => {
     });
 
     await batch.commit();
-    try {
-      Object.keys(sessionStorage).filter((k) => k.startsWith("book:")).forEach((k) => sessionStorage.removeItem(k));
-    } catch {
-      /* ignore */
-    }
+    clearBookCache();
     status("Published. Readers will see the new text the next time they open the site.");
+    showPublished().catch(() => {});
   } catch (err) {
     status(
       err.code === "permission-denied"
         ? "Firestore refused the write. Check that your account has admin: true and that the security rules are deployed."
         : "Publishing failed. Check your connection and try again.",
+      true
+    );
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-remove").addEventListener("click", async () => {
+  if (!published) return;
+  const title = published.title || "the book";
+  if (!confirm(`Remove “${title}” from the site? Readers will see that the book isn’t published yet. Their comments are kept. To bring it back, publish the file again.`)) return;
+  const btn = $("btn-remove");
+  btn.disabled = true;
+  status("Removing the book…");
+  try {
+    const batch = writeBatch(db);
+    const existing = await getDocs(collection(db, "chapters"));
+    existing.forEach((d) => batch.delete(d.ref));
+    batch.delete(doc(db, "book", "meta"));
+    await batch.commit();
+    clearBookCache();
+    status("Removed. Readers will see that the book isn’t published the next time they open the site.");
+    await showPublished();
+  } catch (err) {
+    status(
+      err.code === "permission-denied"
+        ? "Firestore refused to remove the book. Check that your account has admin: true and that the security rules are deployed."
+        : "Removing the book failed. Check your connection and try again.",
       true
     );
   } finally {
