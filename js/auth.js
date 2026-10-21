@@ -136,11 +136,18 @@ export function watchAccess(callback) {
     const started = Date.now();
     let delay = 3000;
     let creating = false;
+    let reported = null; // the profile last passed to callback, as JSON
 
     const subscribe = () => {
+      reported = null; // a new listener reports its first profile, even if unchanged
       unsubProfile = onSnapshot(
         ref,
+        { includeMetadataChanges: true },
         (snap) => {
+          // A profile this tab just created shows up first as a local write.
+          // The security rules can't see it until the server confirms it, so
+          // reading the book now would be refused: wait for that confirmation.
+          if (snap.metadata.hasPendingWrites) return;
           if (!snap.exists()) {
             // First login: create the profile. The snapshot fires again once
             // the document exists.
@@ -151,6 +158,10 @@ export function watchAccess(callback) {
             return;
           }
           const profile = snap.data();
+          // Metadata changes (going offline and back) repeat the same profile.
+          const json = JSON.stringify(profile);
+          if (json === reported) return;
+          reported = json;
           callback({ state: profile.approved === true ? "approved" : "pending", user, profile });
         },
         (error) => {

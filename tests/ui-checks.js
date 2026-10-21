@@ -55,6 +55,7 @@ async (page) => {
     await evalPage(() => localStorage.setItem("mock:approved", "0"));
     await open("");
     check("Login screen shows for signed-out visitors", await visible("#view-login"));
+    check("The sign-in screen links to Galleyleaf for authors", (await visible("#galleyleaf-link")) && (await page.locator("#galleyleaf-link").getAttribute("href")) === "https://galleyleaf.web.app/");
 
     await page.getByRole("button", { name: "Continue with Google" }).click();
     await wait(300);
@@ -66,6 +67,13 @@ async (page) => {
     const chapters = await page.locator("#chapter-list li").count();
     check("Library lists the chapters", chapters > 0, String(chapters));
     await evalPage(() => localStorage.setItem("mock:approved", "1"));
+
+    /* ---------- A reader's first sign-in ---------- */
+    await evalPage(() => { localStorage.setItem("mock:fresh", "1"); sessionStorage.clear(); });
+    await open("");
+    await wait(900);
+    check("A reader's first sign-in opens the book", (await visible("#view-library")) && !(await visible("#library-message")) && (await page.locator("#chapter-list li").count()) > 0, (await visible("#library-message")) ? await text("#library-message-text") : "");
+    await evalPage(() => localStorage.removeItem("mock:fresh"));
 
     /* ---------- Paragraph view ---------- */
     await evalPage(() => localStorage.setItem("reader:pref:readMode", '"paragraph"'));

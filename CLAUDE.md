@@ -56,6 +56,7 @@ This is the public template. Each author deploys their own copy into their own F
   - The comment icon changes colour when the paragraph has comments.
 - **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser. That page also shows the published book and can remove it: one batch deletes `book/meta` and every chapter, readers' comments are kept, and readers see that the book isn't published yet.
 - **Contents page with no book:** it hides the title, chapters and bookmarks and shows only a message. Admins also get a "Publish the book" button there.
+- **Sign-in screen:** below the Google button, a short note tells readers who write that Galleyleaf can share their book too, linking to `https://galleyleaf.web.app/` in a new tab.
 - **Top bar and account menu:** Contents and both admin pages share one top bar: the book title (linking to Contents), the theme button and the avatar. The reader's top bar has the back arrow, chapter title, view, text size and theme buttons, and the avatar too. The avatar opens the same menu everywhere: who is signed in, links to Contents, Readers and comments, and Publish the book (the admin links only for admins), and Sign out. Pages hold an empty `<div class="account" data-account-menu>` with `data-root` and `data-current`, and `js/account-menu.js` builds the menu into each one, so its markup lives in one place.
 - **Theme:** `js/theme.js` applies the saved theme (`reader:pref:theme`, else the system's) and handles every theme button, on the reader and the admin pages alike.
 - **Two reading views:** the reader switches between them with the top-bar toggle, and the choice is saved.
@@ -153,8 +154,8 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 54 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
-- sign-in, and removed and restored access
+`tests/run-ui-tests.sh` runs 56 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+- sign-in (including a reader's first sign-in), and removed and restored access
 - both reading views
 - comments (including the daily limit), bookmarks and chapter completion
 - the account menu, and removing the published book
@@ -167,7 +168,7 @@ Hosting serves the project root and ignores:
 The test swaps the gstatic Firebase files for the mock in `tests/mock/`, which builds the book from `tests/fixtures/sample-book.md`, a short original sample manuscript. It keeps users and comments in memory and runs no security rules, so it never touches the real project. The mock's test hooks are:
 - `localStorage["mock:approved"] = "0"` simulates a reader whose access was removed.
 - `window.__approve()` restores access live.
-- `localStorage["mock:fresh"] = "1"` starts with no profile, as on a first sign-in.
+- `localStorage["mock:fresh"] = "1"` starts with no profile, as on a first sign-in. Like Firestore, the new profile first reaches the listener as a pending local write and is confirmed 400 ms later; until then the book can't be read, as the rules can't see the profile yet.
 - `localStorage["mock:notReady"] = "N"` refuses the first N profile reads with `permission-denied`, as before new rules arrive.
 - `localStorage["mock:quotaUsed"] = "N"` starts the reader's daily comment count at N.
 - `localStorage["mock:noBook"] = "1"` means no book is published. Removing the book on the publish page sets it.
@@ -209,11 +210,3 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 - **Colours:** colour tokens live on `:root` in `css/styles.css`, with light and dark themes.
 - **Layout:** mobile-first, with breakpoints at 600px and 960px.
 - **Accessibility:** touch targets are at least 44px, and reduced motion is respected.
-
-## Roadmap
-
-- **"Open in Cloud Shell" button and `setup.sh`: done.**
-- **Still to come for setup:**
-  - a Cloud Shell side-panel tutorial
-- **The Galleyleaf mobile app:** it will let readers open approved books from their phone.
-  - Each book's site will gain a `reader.json`, an app sign-in page, email-link sign-in, and an "Available in the app" switch on the admin page.

@@ -7,7 +7,10 @@
 // - localStorage "mock:notReady" = "N" refuses the first N reads of u1's
 //   profile with permission-denied, as before new security rules arrive.
 // - localStorage "mock:fresh" = "1" starts with no profile for u1, as on a
-//   first sign-in, so the app has to create it.
+//   first sign-in, so the app has to create it. As in Firestore, the profile
+//   listener first sees the new profile as a pending local write, and the
+//   server confirms it a moment later; until then the book can't be read,
+//   since the security rules can't see the profile yet.
 // - localStorage "mock:quotaUsed" = "N" starts u1's daily comment quota at N writes.
 // - localStorage "mock:noBook" = "1" means no book is published. Removing the
 //   book on the upload page sets it.
@@ -44,6 +47,10 @@ let notReady = Number(localStorage.getItem("mock:notReady") || 0);
 const refuse = () => notReady > 0 && notReady-- > 0;
 const denied = () => Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
 
+// Profiles written but not yet confirmed by the "server".
+const pendingProfiles = new Set();
+const CONFIRM_MS = 400;
+
 const listeners = { me: new Set(), users: new Set(), mine: new Set(), group: new Set() };
 const emit = (set) => set.forEach((fn) => fn());
 
@@ -65,7 +72,9 @@ export const serverTimestamp = () => ts();
 
 const snapDoc = (id, data, uid) => ({ id, data: () => data, ref: { parent: { parent: { id: uid } } } });
 
-export function onSnapshot(ref, next, onError) {
+export function onSnapshot(ref, ...args) {
+  if (typeof args[0] === "object") args.shift(); // options
+  const [next, onError] = args;
   if (ref.path.startsWith("users/") && !ref.filter && refuse()) {
     setTimeout(() => onError?.(denied()), 20);
     return () => {};
@@ -86,7 +95,11 @@ export function onSnapshot(ref, next, onError) {
     };
   } else if (ref.path.startsWith("users/")) {
     set = listeners.me;
-    fn = () => next({ exists: () => true, data: () => users[ref.id] });
+    fn = () => next({
+      exists: () => !!users[ref.id],
+      data: () => users[ref.id],
+      metadata: { hasPendingWrites: pendingProfiles.has(ref.id) },
+    });
   }
   set.add(fn);
   setTimeout(fn, 20);
@@ -103,6 +116,7 @@ export async function getDoc(ref) {
   if (ref.path.endsWith("/limits/commentWrites")) return { exists: () => !!quota, data: () => quota };
   if (ref.path.startsWith("users/") && refuse()) throw denied();
   if (ref.path.startsWith("users/")) return { exists: () => !!users[ref.id], data: () => users[ref.id] };
+  if (pendingProfiles.size) throw denied();
   const book = await bookPromise;
   if (bookRemoved()) return { exists: () => false, data: () => undefined };
   if (ref.path === "book/meta") {
@@ -135,7 +149,11 @@ export async function getDocs(ref) {
 export async function setDoc(ref, data) {
   if (!ref.path.startsWith("users/")) return;
   users[ref.id] = { ...data };
+  pendingProfiles.add(ref.id);
   emit(listeners.users);
+  emit(listeners.me);
+  await new Promise((resolve) => setTimeout(resolve, CONFIRM_MS));
+  pendingProfiles.delete(ref.id);
   emit(listeners.me);
 }
 

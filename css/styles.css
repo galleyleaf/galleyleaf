@@ -240,6 +240,20 @@ svg { width: 1.25rem; height: 1.25rem; flex: none; }
 
 .form-error { color: var(--danger); font-size: 0.9375rem; }
 
+/* Sign-in: a quiet note for readers who write too */
+.gate-note {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 38ch;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.gate-note a { justify-self: start; color: var(--ink); font-weight: 500; }
+.gate-note a:hover { color: var(--gold); }
+
 /* Pending: a leaf slowly drifting round, the only ambient motion in the app */
 .pending-orbit {
   position: relative;
