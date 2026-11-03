@@ -32,9 +32,14 @@ const users = {
 users.u1.approved = localStorage.getItem("mock:approved") !== "0";
 if (localStorage.getItem("mock:fresh") === "1") delete users.u1;
 
+// A fixed time, so a comment keeps its createdAt across page loads (the admin page
+// marks comments newer than the last visit as new).
+const fixed = new Date("2026-01-15T10:00:00Z");
+const fixedTs = { toDate: () => fixed, toMillis: () => +fixed };
+
 // Other readers' comments, visible on the admin page.
 const otherComments = [
-  { id: "x1", uid: "u3", chapterId: "chapter-2", paragraphIndex: 4, text: "Loved this moment.", createdAt: ts(60), updatedAt: ts(60) },
+  { id: "x1", uid: "u3", chapterId: "chapter-2", paragraphIndex: 4, text: "Loved this moment.", createdAt: fixedTs, updatedAt: fixedTs },
 ];
 
 // The signed-in user's comments, and their daily comment quota.
@@ -142,6 +147,11 @@ export async function getDocs(ref) {
     ? book.sections.map((s) => ({ id: s.id, ref: { path: `chapters/${s.id}`, id: s.id } }))
     : [];
   return { docs, forEach: (fn) => docs.forEach(fn) };
+}
+
+export async function getCountFromServer(ref) {
+  const count = ref.group ? otherComments.length + myComments.size : 0;
+  return { data: () => ({ count }) };
 }
 
 /* ---------- Writes ---------- */

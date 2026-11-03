@@ -62,7 +62,7 @@ This is the public template. Each author deploys their own copy into their own F
 - **Two reading views:** the reader switches between them with the top-bar toggle, and the choice is saved.
   - **Paragraph view** shows one paragraph at a time, with Prev/Next, swipe and ←/→.
   - **Scroll view** shows the whole chapter, and the paragraph at the reading line (35% down the viewport) is highlighted. Comments and bookmarks still attach to that paragraph.
-- **Saved in the browser (`localStorage`):** progress, bookmarks, finished chapters, theme, text size and view. They are kept per account (`reader:{uid}:...`), and preferences use `reader:pref:{name}`.
+- **Saved in the browser (`localStorage`):** progress, bookmarks, finished chapters, theme, text size, view and, for admins, which comments they've seen. They are kept per account (`reader:{uid}:...`), and preferences use `reader:pref:{name}`.
 - **Tapping or clicking a paragraph opens its comment sheet** in both views. In scroll view it also makes that paragraph active.
 - **Copy deterrents** (casual copying only; screenshots and developer tools still work):
   - the book text can't be selected
@@ -74,6 +74,10 @@ This is the public template. Each author deploys their own copy into their own F
 - **Caching:** HTML pages, JS, CSS and JSON (`site.json`) are served with `Cache-Control: no-cache`, so browsers check for a newer copy every time and deploys show up immediately. Without it Firebase Hosting sends `max-age=3600`, and a cached old page could run with newer scripts. Images and icons keep that one-hour default.
 - **Security headers:** HTML pages (`**/*.html`, `/` and `/admin/`) get a Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff` and a `Referrer-Policy`. They're set on pages only, because `frame-ancestors` on Firebase's `/__/auth/` pages would break popup sign-in. When you load something from a new origin, add it to the CSP in all three header blocks of `firebase.json`; the UI tests apply the CSP and fail on anything it blocks.
 - **Version and updates:** both admin pages show the site's version (from `site.json`) in a footer with a link to the setup page. `js/site-version.js` asks GitHub's API for the latest release of `galleyleaf/galleyleaf`, caches the answer for 6 hours in `localStorage`, and shows an "Update my site" notice when it's newer. Sites deployed before v0.2.2 have no version in `site.json`, so they show "an earlier version". Updating itself happens on the setup page.
+- **New comments badge:** there's no email notification, since sending mail needs Cloud Functions (Blaze). Instead, for admins:
+  - The avatar gets a gold dot, and "Readers and comments" in the account menu shows how many comments arrived since the admin page was last open. It comes from one `getCountFromServer` query per page load (`countNewComments()` in `js/comments.js`), compared with the total saved on the last visit. A filter on `createdAt` would need a collection-group index the setup page doesn't deploy. As a result, comments deleted in between make it undercount.
+  - The admin page marks comments created after the last visit with "New" and shows "N new" next to the count. It doesn't show the badge itself.
+  - What was seen is kept per account in this browser (`reader:{uid}:commentsSeen`, `{count, at}`). Before the first visit, every comment counts as new.
 - **Admin page reads:** it subscribes to every comment, which is fine at a beta-reader scale. Paging it would need `orderBy` on a collection-group query, which needs an index the setup page doesn't deploy. Excerpts are fetched only for chapters in `book/meta`, since a comment's `chapterId` is chosen by the reader.
 
 ## Data model (Firestore)
@@ -154,13 +158,13 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 56 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 59 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in (including a reader's first sign-in), and removed and restored access
 - both reading views
 - comments (including the daily limit), bookmarks and chapter completion
 - the account menu, and removing the published book
 - the version footer and the update notice (GitHub's API is answered by the test)
-- the admin page, including a first sign-in that happens there
+- the admin page, including a first sign-in that happens there, and the new comments badge
 - reading a `.docx` on the publish page (`tests/fixtures/sample-book.docx`, made from the sample manuscript with `pandoc`)
 - waiting for the security rules right after setup
 - the security headers: every HTML page is served with the CSP from `firebase.json`, and any violation fails

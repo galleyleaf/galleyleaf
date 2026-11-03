@@ -14,6 +14,7 @@ import { renderAccount } from "../js/account-menu.js";
 import { showSiteVersion } from "../js/site-version.js";
 import "../js/theme.js";
 import { loadChapter, loadMeta } from "../js/book.js";
+import { getCommentsSeen, setCommentsSeen } from "../js/comments.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -23,6 +24,7 @@ const state = {
   comments: [], // { id, uid, chapterId, paragraphIndex, text, createdAt, updatedAt }
   chapters: new Map(), // chapterId -> { title, order }
   paragraphs: new Map(), // chapterId -> string[] (HTML)
+  seenAt: 0, // comments created after this (ms) are marked new; read once per page load
   unsubs: [],
 };
 
@@ -113,6 +115,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   state.me = user.uid;
+  state.seenAt = getCommentsSeen(user.uid).at;
   $("status").hidden = true;
   $("content").hidden = false;
   showSiteVersion();
@@ -140,6 +143,9 @@ onAuthStateChanged(auth, async (user) => {
       (snap) => {
         state.comments = snap.docs.map((d) => ({ id: d.id, uid: d.ref.parent.parent.id, ...d.data() }));
         state.comments.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+        // Everything listed now counts as seen for the account menu's badge and the next visit.
+        const newest = state.comments[0]?.createdAt?.toMillis?.() ?? 0;
+        setCommentsSeen(user.uid, { count: state.comments.length, at: Math.max(newest, getCommentsSeen(user.uid).at) });
         loadExcerpts().then(renderComments);
         renderComments();
       },
@@ -271,6 +277,8 @@ function renderChapterFilter() {
   select.value = ids.includes(current) ? current : "";
 }
 
+const isNew = (c) => (c.createdAt?.toMillis?.() ?? 0) > state.seenAt;
+
 function renderComments() {
   renderChapterFilter();
   renderReaderFilter();
@@ -280,6 +288,9 @@ function renderComments() {
   const list = state.comments.filter((c) => (!chapter || c.chapterId === chapter) && (!reader || c.uid === reader));
 
   $("comments-count").textContent = state.comments.length;
+  const fresh = state.comments.filter(isNew).length;
+  $("comments-new").hidden = !fresh;
+  $("comments-new").textContent = `${fresh} new`;
   $("comments-empty").hidden = list.length > 0;
   $("comments-empty").textContent = state.comments.length ? "No comments match these filters." : "No comments yet.";
 
@@ -287,6 +298,7 @@ function renderComments() {
     ...list.map((c) => {
       const li = document.createElement("li");
       li.className = "admin-comment";
+      li.classList.toggle("is-new", isNew(c));
 
       const head = document.createElement("div");
       head.className = "admin-comment-head";
@@ -304,6 +316,12 @@ function renderComments() {
       del.className = "link-btn link-danger";
       del.textContent = "Delete";
       del.addEventListener("click", () => removeComment(c, del));
+      if (isNew(c)) {
+        const tag = document.createElement("span");
+        tag.className = "new-tag";
+        tag.textContent = "New";
+        head.append(tag);
+      }
       head.append(who, where, when, open, del);
 
       li.append(head);
