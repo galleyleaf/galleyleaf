@@ -101,6 +101,15 @@
   background: var(--surface);
   border: 1px solid var(--line);
 }
+.admin-comment.is-new { border-color: var(--gold); box-shadow: inset 3px 0 0 var(--gold); }
+.admin-comment-head .new-tag {
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--paper);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 .admin-comment-head { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; font-size: 0.875rem; }
 .admin-comment-head strong { font-weight: 600; }
 .admin-comment-head span { color: var(--muted); }

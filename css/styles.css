@@ -318,14 +318,14 @@ a.topbar-brand { color: inherit; text-decoration: none; }
   background: none;
   cursor: pointer;
 }
-.avatar-btn img,
-.avatar-btn span {
+.avatar-img,
+.avatar-initial {
   grid-area: 1 / 1;
   width: 32px;
   height: 32px;
   border-radius: 50%;
 }
-.avatar-btn span {
+.avatar-initial {
   display: grid;
   place-items: center;
   background: var(--ink);
@@ -333,7 +333,18 @@ a.topbar-brand { color: inherit; text-decoration: none; }
   font-size: 0.875rem;
   font-weight: 600;
 }
-.avatar-btn img { position: relative; z-index: 1; object-fit: cover; }
+.avatar-img { position: relative; z-index: 1; object-fit: cover; }
+.avatar-dot {
+  position: absolute;
+  z-index: 2;
+  top: 5px;
+  right: 5px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--gold);
+}
 
 .account-menu {
   position: absolute;
@@ -363,6 +374,17 @@ a.topbar-brand { color: inherit; text-decoration: none; }
 }
 .menu-link:hover { color: var(--gold); }
 .menu-link[aria-current="page"] { font-weight: 600; }
+.menu-count {
+  margin-left: 0.5rem;
+  min-width: 1.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--paper);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
 .menu-link[aria-current="page"]::after {
   content: "";
   width: 6px;

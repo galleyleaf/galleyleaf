@@ -1,10 +1,13 @@
 // The avatar menu shared by the reader and the admin pages: who is signed in,
-// links between the pages (the admin ones only for admins) and sign out.
+// links between the pages (the admin ones only for admins) and sign out. For
+// admins, a gold dot on the avatar and a count on "Readers and comments" show
+// how many comments arrived since the admin page was last open.
 // Pages place an empty <div class="account" data-account-menu hidden> wherever
 // the avatar goes; this module builds the menu into each one. Attributes:
 //   data-root     path from the page to the site root ("" or "../")
 //   data-current  the page it is on: "contents", "readers" or "publish"
 import { signOut } from "./auth.js";
+import { countNewComments } from "./comments.js";
 
 const PAGES = [
   { id: "contents", label: "Contents", href: "" },
@@ -19,6 +22,7 @@ const menus = [...document.querySelectorAll("[data-account-menu]")].map((account
     <button type="button" class="avatar-btn" aria-haspopup="true" aria-expanded="false" aria-controls="${id}" aria-label="Account">
       <img class="avatar-img" alt="" referrerpolicy="no-referrer" hidden>
       <span class="avatar-initial" aria-hidden="true"></span>
+      <span class="avatar-dot" hidden></span>
     </button>
     <div class="account-menu" id="${id}" hidden>
       <p class="account-name"></p>
@@ -32,6 +36,7 @@ const menus = [...document.querySelectorAll("[data-account-menu]")].map((account
     a.className = "menu-link";
     a.href = page.href ? root + page.href : root || "#/";
     a.textContent = page.label;
+    if (page.id === "readers") a.insertAdjacentHTML("beforeend", '<span class="menu-count" hidden></span>');
     if (page.id === account.dataset.current) a.setAttribute("aria-current", "page");
     if (page.admin) {
       a.dataset.adminOnly = "";
@@ -74,6 +79,20 @@ document.addEventListener("keydown", (e) => {
   open.button.focus();
 });
 
+/** Shows `count` new comments on every avatar and "Readers and comments" link. */
+function showNewComments(count) {
+  for (const { account, button } of menus) {
+    account.querySelector(".avatar-dot").hidden = !count;
+    button.setAttribute("aria-label", count ? `Account, ${count} new ${count === 1 ? "comment" : "comments"}` : "Account");
+    const pill = account.querySelector(".menu-count");
+    pill.hidden = !count;
+    pill.textContent = count || "";
+    pill.setAttribute("aria-label", `${count} new`);
+  }
+}
+
+let countedFor = null;
+
 /** Shows the signed-in user in every menu, or hides them when `user` is null. */
 export function renderAccount(user, profile) {
   closeAccountMenu();
@@ -93,5 +112,13 @@ export function renderAccount(user, profile) {
       img.hidden = true;
     }
     for (const link of account.querySelectorAll("[data-admin-only]")) link.hidden = profile?.admin !== true;
+  }
+  // Counted once per page load. The admin page lists the new comments itself.
+  if (!user || profile?.admin !== true) {
+    countedFor = null;
+    showNewComments(0);
+  } else if (countedFor !== user.uid && !menus.some(({ account }) => account.dataset.current === "readers")) {
+    countedFor = user.uid;
+    countNewComments(user.uid).then((count) => countedFor === user.uid && showNewComments(count), () => {});
   }
 }

@@ -178,7 +178,7 @@ async (page) => {
 
     /* ---------- Account menu ---------- */
     const openMenu = () => page.locator(".avatar-btn:visible").click();
-    const menuLinks = async () => (await page.locator(".account-menu:visible a:visible").allTextContents()).map((t) => t.trim());
+    const menuLinks = () => page.locator(".account-menu:visible a:visible").evaluateAll((links) => links.map((a) => a.firstChild.textContent.trim()));
     await open("#/read/chapter-1/1");
     await openMenu();
     check("The reader's top bar has the account menu", (await menuLinks()).includes("Contents"));
@@ -187,15 +187,18 @@ async (page) => {
     await openMenu();
     const libraryLinks = await menuLinks();
     check("The account menu links to every page for an admin", libraryLinks.join("|") === "Contents|Readers and comments|Publish the book", libraryLinks.join("|"));
+    check("The avatar shows new comments for an admin", (await visible(".avatar-dot")) && (await text(".account-menu:visible .menu-count")) === "1", await text(".account-menu:visible .menu-count"));
     await evalPage(() => localStorage.setItem("reader:pref:theme", '"dark"'));
     await page.locator(".account-menu:visible").getByRole("link", { name: "Readers and comments" }).click();
     await wait(900);
     check("The account menu opens the admin page", await visible("#content"));
+    check("The admin page marks comments that are new", (await text("#comments-new")) === "1 new" && (await page.locator("#comment-list li.is-new").count()) === 1, await text("#comments-new"));
     check("Admin pages use the saved theme", await evalPage(() => document.documentElement.dataset.theme === "dark"));
     await evalPage(() => localStorage.removeItem("reader:pref:theme"));
 
     /* ---------- Admin ---------- */
     await open("admin/");
+    check("Seen comments aren't new on the next visit", !(await visible("#comments-new")) && (await page.locator("#comment-list li.is-new").count()) === 0);
     await openMenu();
     check("The admin page has the same account menu", (await menuLinks()).length === 3 && (await text('.account-menu [aria-current="page"]')).trim() === "Readers and comments");
     await page.keyboard.press("Escape");

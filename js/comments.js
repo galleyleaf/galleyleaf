@@ -4,8 +4,10 @@
 // refuse a comment write that doesn't advance it (see firestore.rules).
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
+  getCountFromServer,
   getDoc,
   onSnapshot,
   query,
@@ -93,4 +95,35 @@ export function updateComment(uid, commentId, text) {
 
 export function deleteComment(uid, commentId) {
   return deleteDoc(doc(db, "users", uid, "comments", commentId));
+}
+
+/* ---------- New comments, for admins ---------- */
+
+// What an admin last saw on the admin page, kept per account in this browser:
+// { count: how many comments there were, at: the newest one's createdAt in ms }.
+// Before the first visit every comment counts as new.
+export function getCommentsSeen(uid) {
+  try {
+    return JSON.parse(localStorage.getItem(`reader:${uid}:commentsSeen`)) || { count: 0, at: 0 };
+  } catch {
+    return { count: 0, at: 0 };
+  }
+}
+
+export function setCommentsSeen(uid, seen) {
+  try {
+    localStorage.setItem(`reader:${uid}:commentsSeen`, JSON.stringify(seen));
+  } catch {
+    /* storage blocked: the badge just keeps counting */
+  }
+}
+
+/**
+ * How many comments were added since the admin page was last open. It compares totals
+ * with one count query (a filter on createdAt would need a collection-group index), so
+ * comments deleted in between make it undercount.
+ */
+export async function countNewComments(uid) {
+  const snap = await getCountFromServer(collectionGroup(db, "comments"));
+  return Math.max(0, snap.data().count - getCommentsSeen(uid).count);
 }
