@@ -15,6 +15,7 @@ import { showSiteVersion } from "../js/site-version.js";
 import "../js/theme.js";
 import { loadChapter, loadMeta } from "../js/book.js";
 import { getCommentsSeen, setCommentsSeen } from "../js/comments.js";
+import { REACTIONS } from "../js/reactions.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,6 +23,7 @@ const state = {
   me: null,
   users: new Map(), // uid -> profile
   comments: [], // { id, uid, chapterId, paragraphIndex, text, createdAt, updatedAt }
+  reactions: [], // { chapterId, marks } per reader and chapter
   chapters: new Map(), // chapterId -> { title, order }
   paragraphs: new Map(), // chapterId -> string[] (HTML)
   seenAt: 0, // comments created after this (ms) are marked new; read once per page load
@@ -150,6 +152,15 @@ onAuthStateChanged(auth, async (user) => {
         renderComments();
       },
       () => status("Comments couldn’t be loaded. Check that the latest security rules are deployed.", true)
+    ),
+    onSnapshot(
+      collectionGroup(db, "reactions"),
+      (snap) => {
+        state.reactions = snap.docs.map((d) => ({ chapterId: d.id, marks: d.data().marks }));
+        loadExcerpts().then(renderReactions);
+        renderReactions();
+      },
+      () => status("Reactions couldn’t be loaded. Check that the latest security rules are deployed.", true)
     )
   );
 });
@@ -241,7 +252,7 @@ function renderPeople() {
 async function loadExcerpts() {
   // Only chapters of the published book: a comment's chapterId is chosen by the reader,
   // so unknown ids would each cost a read.
-  const needed = [...new Set(state.comments.map((c) => c.chapterId))].filter(
+  const needed = [...new Set([...state.comments, ...state.reactions].map((c) => c.chapterId))].filter(
     (id) => state.chapters.has(id) && !state.paragraphs.has(id)
   );
   await Promise.all(
@@ -355,5 +366,99 @@ async function removeComment(c, button) {
   }
 }
 
+/* ---------- Reactions ---------- */
+
+const MAX_REACTION_ROWS = 50;
+
+// One row per paragraph with its tally, for chapters still in the book.
+function reactionRows() {
+  const rows = new Map();
+  for (const { chapterId, marks } of state.reactions) {
+    if (!state.chapters.has(chapterId)) continue;
+    for (const [key, kind] of Object.entries(marks)) {
+      if (!REACTIONS.some((r) => r.id === kind)) continue;
+      const id = `${chapterId}/${key}`;
+      if (!rows.has(id)) rows.set(id, { chapterId, paragraphIndex: Number(key), tally: {}, total: 0 });
+      const row = rows.get(id);
+      row.tally[kind] = (row.tally[kind] || 0) + 1;
+      row.total++;
+    }
+  }
+  return [...rows.values()];
+}
+
+function renderReactionFilters(rows) {
+  const chapter = $("filter-reaction-chapter");
+  const current = chapter.value;
+  const ids = [...new Set(rows.map((r) => r.chapterId))].sort(
+    (a, b) => state.chapters.get(a).order - state.chapters.get(b).order
+  );
+  chapter.replaceChildren(new Option("All chapters", ""), ...ids.map((id) => new Option(chapterTitle(id), id)));
+  chapter.value = ids.includes(current) ? current : "";
+}
+
+function renderReactions() {
+  const rows = reactionRows();
+  renderReactionFilters(rows);
+
+  const chapter = $("filter-reaction-chapter").value;
+  const kind = $("filter-reaction-kind").value;
+  const score = (r) => (kind ? r.tally[kind] : r.total);
+  const list = rows
+    .filter((r) => (!chapter || r.chapterId === chapter) && (!kind || r.tally[kind]))
+    .sort((a, b) =>
+      score(b) - score(a)
+      || state.chapters.get(a.chapterId).order - state.chapters.get(b.chapterId).order
+      || a.paragraphIndex - b.paragraphIndex
+    );
+
+  $("reactions-count").textContent = rows.reduce((sum, r) => sum + r.total, 0);
+  $("reactions-empty").hidden = list.length > 0;
+  $("reactions-empty").textContent = rows.length ? "No reactions match these filters." : "No reactions yet.";
+  $("reactions-more").hidden = list.length <= MAX_REACTION_ROWS;
+  $("reactions-more").textContent = `Showing the ${MAX_REACTION_ROWS} paragraphs with the most reactions, out of ${list.length}.`;
+
+  $("reaction-list").replaceChildren(
+    ...list.slice(0, MAX_REACTION_ROWS).map((r) => {
+      const li = document.createElement("li");
+      li.className = "admin-comment";
+
+      const head = document.createElement("div");
+      head.className = "admin-comment-head";
+      const where = document.createElement("strong");
+      where.textContent = `${chapterTitle(r.chapterId)}, paragraph ${r.paragraphIndex + 1}`;
+      const open = document.createElement("a");
+      open.href = `../#/read/${encodeURIComponent(r.chapterId)}/${r.paragraphIndex + 1}`;
+      open.textContent = "Open paragraph";
+      head.append(where, open);
+      li.append(head);
+
+      const paragraph = state.paragraphs.get(r.chapterId)?.[r.paragraphIndex];
+      if (paragraph) {
+        const quote = document.createElement("blockquote");
+        quote.className = "admin-comment-quote";
+        quote.textContent = excerpt(paragraph);
+        li.append(quote);
+      }
+
+      const tally = document.createElement("ul");
+      tally.className = "reaction-tally";
+      for (const { id, label } of REACTIONS) {
+        if (!r.tally[id]) continue;
+        const item = document.createElement("li");
+        const count = document.createElement("strong");
+        count.textContent = r.tally[id];
+        item.append(`${label} `, count);
+        tally.append(item);
+      }
+      li.append(tally);
+      return li;
+    })
+  );
+}
+
+$("filter-reaction-kind").append(...REACTIONS.map((r) => new Option(r.label, r.id)));
+$("filter-reaction-chapter").addEventListener("change", renderReactions);
+$("filter-reaction-kind").addEventListener("change", renderReactions);
 $("filter-chapter").addEventListener("change", renderComments);
 $("filter-reader").addEventListener("change", renderComments);

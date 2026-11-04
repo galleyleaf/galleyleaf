@@ -125,6 +125,8 @@
   font-size: 0.9375rem;
 }
 .admin-comment-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reaction-tally { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; margin: 0; padding: 0; list-style: none; font-size: 0.875rem; }
+.reaction-tally strong { font-weight: 600; color: var(--gold); }
 
 /* Publish page */
 .file-drop { display: grid; gap: 0.5rem; padding: 1.25rem; border: 1px dashed var(--line); border-radius: 14px; background: var(--surface); }

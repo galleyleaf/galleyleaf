@@ -12,6 +12,7 @@
 //   server confirms it a moment later; until then the book can't be read,
 //   since the security rules can't see the profile yet.
 // - localStorage "mock:quotaUsed" = "N" starts u1's daily comment quota at N writes.
+// - Other readers' reactions are fixed; the signed-in user's live in memory.
 // - localStorage "mock:noBook" = "1" means no book is published. Removing the
 //   book on the upload page sets it.
 
@@ -42,6 +43,15 @@ const otherComments = [
   { id: "x1", uid: "u3", chapterId: "chapter-2", paragraphIndex: 4, text: "Loved this moment.", createdAt: fixedTs, updatedAt: fixedTs },
 ];
 
+// Other readers' reactions, visible on the admin page.
+const otherReactions = [
+  { id: "chapter-2", marks: { 4: "confused", 1: "loved" } },
+  { id: "chapter-2", marks: { 4: "confused" } },
+];
+
+// The signed-in user's reactions by chapter id.
+const myReactions = new Map();
+
 // The signed-in user's comments, and their daily comment quota.
 const myComments = new Map();
 let nextId = 0;
@@ -56,7 +66,7 @@ const denied = () => Object.assign(new Error("Missing or insufficient permission
 const pendingProfiles = new Set();
 const CONFIRM_MS = 400;
 
-const listeners = { me: new Set(), users: new Set(), mine: new Set(), group: new Set() };
+const listeners = { me: new Set(), users: new Set(), mine: new Set(), group: new Set(), reactions: new Set() };
 const emit = (set) => set.forEach((fn) => fn());
 
 /* ---------- References ---------- */
@@ -72,6 +82,8 @@ export const collectionGroup = (_db, name) => ({ path: name, group: true });
 export const where = (field, _op, value) => ({ field, value });
 export const query = (ref, filter) => ({ ...ref, filter });
 export const serverTimestamp = () => ts();
+const DELETE_FIELD = Symbol("deleteField");
+export const deleteField = () => DELETE_FIELD;
 
 /* ---------- Reads ---------- */
 
@@ -80,13 +92,28 @@ const snapDoc = (id, data, uid) => ({ id, data: () => data, ref: { parent: { par
 export function onSnapshot(ref, ...args) {
   if (typeof args[0] === "object") args.shift(); // options
   const [next, onError] = args;
-  if (ref.path.startsWith("users/") && !ref.filter && refuse()) {
+  const isReactions = ref.path.includes("/reactions/");
+  if (ref.path.startsWith("users/") && !ref.filter && !isReactions && refuse()) {
     setTimeout(() => onError?.(denied()), 20);
     return () => {};
   }
   let fn;
   let set;
-  if (ref.group) {
+  if (ref.group && ref.path === "reactions") {
+    set = listeners.reactions;
+    fn = () => next({
+      docs: [
+        ...otherReactions,
+        ...[...myReactions].map(([id, marks]) => ({ id, marks })),
+      ].map(({ id, marks }) => snapDoc(id, { marks })),
+    });
+  } else if (isReactions) {
+    set = listeners.reactions;
+    fn = () => next({
+      exists: () => myReactions.has(ref.id),
+      data: () => ({ marks: myReactions.get(ref.id) }),
+    });
+  } else if (ref.group) {
     set = listeners.group;
     fn = () => next({ docs: [...otherComments, ...myComments.values()].map((c) => snapDoc(c.id, c, c.uid)) });
   } else if (ref.path === "users") {
@@ -157,6 +184,16 @@ export async function getCountFromServer(ref) {
 /* ---------- Writes ---------- */
 
 export async function setDoc(ref, data) {
+  if (ref.path.includes("/reactions/")) {
+    const marks = { ...myReactions.get(ref.id) };
+    for (const [key, value] of Object.entries(data.marks)) {
+      if (value === DELETE_FIELD) delete marks[key];
+      else marks[key] = value;
+    }
+    myReactions.set(ref.id, marks);
+    emit(listeners.reactions);
+    return;
+  }
   if (!ref.path.startsWith("users/")) return;
   users[ref.id] = { ...data };
   pendingProfiles.add(ref.id);

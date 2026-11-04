@@ -5,7 +5,7 @@ Share your book with a few chosen readers before it's published, and get their f
 Galleyleaf is a small website that you deploy into your own free Firebase project. Your readers sign in with Google and read on their phone or computer, one paragraph at a time or as a scrolling chapter. They can leave a private note on any paragraph, and you see every note in one place.
 
 - **Your book stays yours.** It lives in your own Firebase project, and only signed-in readers you allow can open it.
-- **Feedback per paragraph.** Readers tap a paragraph to comment. You read all comments, filtered by chapter or reader, on your admin page.
+- **Feedback per paragraph.** Readers tap a paragraph to comment or react (Loved it, Funny, Moved, Confused or Dragging). You read all comments, filtered by chapter or reader, and see which paragraphs drew the most reactions, on your admin page.
 - **Made for reading.** It works well on phones and offers two reading views, light and dark themes, adjustable text size, bookmarks and saved progress.
 - **Discourages casual copying.** Text can't be selected, copied or printed from the reader.
 - **Free to run.** Everything fits in Firebase's free Spark plan, and there's no billing to set up.
@@ -47,6 +47,7 @@ Setup takes about 10 minutes in your browser: create a project on the Firebase w
 From `https://<your-project>.web.app/admin/` you can:
 - see who has signed in, and remove or restore anyone's access
 - read every comment, filtered by chapter or reader, and delete spam
+- see the paragraphs with the most reactions, filtered by chapter or reaction
 
 **If something goes wrong:**
 - **Setup stops with an error.** Read the message: it says what to do. Then click **Try again**; it picks up where it stopped.

@@ -1,6 +1,7 @@
 // One-paragraph-at-a-time reader, bookmarks, comment sheet and chapter completion.
 import { loadChapter, loadMeta } from "./book.js";
 import { addComment, deleteComment, updateComment, watchChapterComments, MAX_COMMENT } from "./comments.js";
+import { REACTIONS, setReaction, watchChapterReactions } from "./reactions.js";
 import { getPref, getProgress, isBookmarked, markCompleted, saveProgress, setPref, toggleBookmark } from "./storage.js";
 import { confetti } from "./celebrate.js";
 
@@ -29,6 +30,7 @@ const el = {
   dialog: $("comment-dialog"),
   sub: $("comment-sub"),
   quote: $("comment-quote"),
+  reactions: $("reaction-row"),
   list: $("comment-list"),
   empty: $("comments-empty"),
   form: $("comment-form"),
@@ -51,6 +53,8 @@ const state = {
   index: 0,
   comments: new Map(),
   unsubComments: null,
+  reactions: new Map(), // paragraph index -> reaction id
+  unsubReactions: null,
   editingId: null,
   token: 0,
   toast: () => {},
@@ -103,8 +107,11 @@ export function initReader({ uid, toast }) {
 export function closeReader() {
   state.unsubComments?.();
   state.unsubComments = null;
+  state.unsubReactions?.();
+  state.unsubReactions = null;
   state.chapter = null;
   state.comments = new Map();
+  state.reactions = new Map();
   if (el.dialog.open) el.dialog.close();
   if (el.celebrate.open) el.celebrate.close();
 }
@@ -124,7 +131,9 @@ export async function openChapter(chapterId, index) {
 
   if (!sameChapter) {
     state.unsubComments?.();
+    state.unsubReactions?.();
     state.comments = new Map();
+    state.reactions = new Map();
     state.chapter = chapter;
     state.flowFor = null;
     state.unsubComments = watchChapterComments(
@@ -137,6 +146,17 @@ export async function openChapter(chapterId, index) {
         if (el.dialog.open) renderCommentList();
       },
       () => state.toast("Comments couldn’t be loaded. Check your connection and reopen the chapter.")
+    );
+    state.unsubReactions = watchChapterReactions(
+      state.uid,
+      chapterId,
+      (byParagraph) => {
+        state.reactions = byParagraph;
+        renderCommentState();
+        renderFlowNotes();
+        if (el.dialog.open) renderReactions();
+      },
+      () => state.toast("Reactions couldn’t be loaded. Check your connection and reopen the chapter.")
     );
   }
 
@@ -202,12 +222,13 @@ function go(index, direction, { scroll = true, instant = false } = {}) {
 
 function renderCommentState() {
   const count = state.comments.get(state.index)?.length || 0;
-  el.comment.classList.toggle("has-comments", count > 0);
+  const reaction = reactionById(state.reactions.get(state.index));
+  el.comment.classList.toggle("has-comments", count > 0 || Boolean(reaction));
   el.badge.hidden = count === 0;
   el.badge.textContent = count > 9 ? "9+" : String(count);
   el.comment.setAttribute(
     "aria-label",
-    count ? `Comments on this paragraph (${count})` : "Add a comment to this paragraph"
+    count || reaction ? noteLabel(state.index, count, reaction) : "Comment on or react to this paragraph"
   );
 }
 
@@ -290,13 +311,15 @@ function paragraphAtReadingLine() {
   return active;
 }
 
-// Gold comment badges on paragraphs that have comments.
+// Gold badges on paragraphs with comments or a reaction: the reader's reaction
+// icon, or the comment icon, and how many comments there are.
 function renderFlowNotes() {
   if (state.mode !== "scroll" || !state.chapter || state.flowFor !== state.chapter.id) return;
   state.flowEls.forEach((p, i) => {
     const count = state.comments.get(i)?.length || 0;
+    const reaction = reactionById(state.reactions.get(i));
     let badge = p.querySelector(".flow-note");
-    if (!count) {
+    if (!count && !reaction) {
       badge?.remove();
       return;
     }
@@ -304,12 +327,22 @@ function renderFlowNotes() {
       badge = document.createElement("button");
       badge.type = "button";
       badge.className = "flow-note";
-      badge.innerHTML = '<svg aria-hidden="true"><use href="#i-comment"/></svg><span></span>';
+      badge.innerHTML = '<svg aria-hidden="true"><use/></svg><span></span>';
       p.append(badge);
     }
-    badge.querySelector("span").textContent = count > 9 ? "9+" : String(count);
-    badge.setAttribute("aria-label", `Comments on paragraph ${i + 1} (${count})`);
+    badge.querySelector("use").setAttribute("href", `#i-${reaction?.id ?? "comment"}`);
+    const label = badge.querySelector("span");
+    label.textContent = count > 9 ? "9+" : count ? String(count) : "";
+    label.hidden = !count;
+    badge.setAttribute("aria-label", noteLabel(i, count, reaction));
   });
+}
+
+function noteLabel(index, count, reaction) {
+  const parts = [];
+  if (count) parts.push(`${count} ${count === 1 ? "comment" : "comments"}`);
+  if (reaction) parts.push(`your reaction: ${reaction.label}`);
+  return `Paragraph ${index + 1}: ${parts.join(", ")}`;
 }
 
 let scrollFrame = 0;
@@ -467,9 +500,45 @@ function openComments() {
   el.quote.textContent = excerpt(chapter.paragraphs[index], 220);
   resetForm();
   renderCommentList();
+  renderReactions();
   el.dialog.showModal();
   if (!state.comments.get(index)?.length && window.matchMedia("(hover: hover)").matches) el.input.focus();
 }
+
+const reactionById = (id) => REACTIONS.find((r) => r.id === id);
+
+function renderReactions() {
+  const current = state.reactions.get(state.index);
+  for (const button of el.reactions.children) {
+    button.setAttribute("aria-pressed", String(button.dataset.reaction === current));
+  }
+}
+
+el.reactions.append(
+  ...REACTIONS.map(({ id, label }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "reaction";
+    button.dataset.reaction = id;
+    button.setAttribute("aria-pressed", "false");
+    button.innerHTML = `<svg aria-hidden="true"><use href="#i-${id}"/></svg><span>${label}</span>`;
+    return button;
+  })
+);
+
+// Tapping a reaction sets it, replacing any other; tapping it again removes it.
+el.reactions.addEventListener("click", async (e) => {
+  const button = e.target.closest(".reaction");
+  if (!button) return;
+  const { id } = state.chapter;
+  const { index } = state;
+  const next = state.reactions.get(index) === button.dataset.reaction ? null : button.dataset.reaction;
+  try {
+    await setReaction(state.uid, id, index, next);
+  } catch {
+    state.toast("Your reaction wasn’t saved. Check your connection and try again.");
+  }
+});
 
 function renderCommentList() {
   const list = state.comments.get(state.index) || [];

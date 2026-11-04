@@ -710,7 +710,7 @@ a.topbar-brand { color: inherit; text-decoration: none; }
   font: 600 0.75rem/1 var(--sans);
   cursor: pointer;
 }
-.flow-note svg { width: 14px; height: 14px; --fill: currentColor; }
+.flow-note svg { width: 14px; height: 14px; --fill: currentColor; --mark: var(--paper); }
 
 .flow-end {
   display: grid;
@@ -847,6 +847,32 @@ dialog { color: var(--ink); }
   font-family: var(--serif);
   font-style: italic;
   color: var(--muted);
+}
+
+/* Reactions: five equal columns, so the row fits the narrowest phone. */
+.reactions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; }
+.reaction {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-height: 60px;
+  padding: 8px 0 6px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: 500 0.75rem/1.1 var(--sans);
+  cursor: pointer;
+}
+.reaction svg { width: 26px; height: 26px; }
+@media (hover: hover) {
+  .reaction:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+}
+.reaction[aria-pressed="true"] { color: var(--gold); font-weight: 600; --fill: var(--gold); --mark: var(--surface); }
+.reaction[aria-pressed="true"] svg { animation: reaction-pop 0.3s cubic-bezier(0.2, 0.7, 0.2, 1.4); }
+@keyframes reaction-pop { from { transform: scale(0.6); } }
+@media (prefers-reduced-motion: reduce) {
+  .reaction[aria-pressed="true"] svg { animation: none; }
 }
 
 .comment-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
