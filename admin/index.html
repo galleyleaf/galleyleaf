@@ -62,6 +62,21 @@
         <p class="empty" id="comments-empty">No comments yet.</p>
       </section>
 
+      <section class="admin-section" aria-labelledby="reactions-heading" style="margin-top:2.5rem">
+        <h2 id="reactions-heading">Reactions <span class="count-pill" id="reactions-count">0</span></h2>
+        <div class="filters">
+          <label>Chapter
+            <select id="filter-reaction-chapter"><option value="">All chapters</option></select>
+          </label>
+          <label>Reaction
+            <select id="filter-reaction-kind"><option value="">All reactions</option></select>
+          </label>
+        </div>
+        <ul class="admin-comments" id="reaction-list"></ul>
+        <p class="empty" id="reactions-empty">No reactions yet.</p>
+        <p class="empty" id="reactions-more" hidden></p>
+      </section>
+
       <section class="admin-section" aria-labelledby="readers-heading" style="margin-top:2.5rem">
         <h2 id="readers-heading">Readers <span class="count-pill" id="readers-count">0</span></h2>
         <ul class="people" id="reader-list"></ul>

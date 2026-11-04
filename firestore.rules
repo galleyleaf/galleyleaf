@@ -47,6 +47,21 @@ rules_version = '2';
 //   not stop a script from using up the free daily write quota.
 //   Only the approved owner can read and write it; it is never deleted.
 //
+// Subcollection: users/{uid}/reactions
+// Document ID: chapter id (the chapter must exist)
+// Fields:
+//   - marks: map (required, <= 5000 entries) of paragraph index as a string
+//     to "loved", "funny", "moved", "confused" or "dragging"
+//   - last: string (required, the paragraph index this write changes)
+//   - updatedAt: timestamp (required, server time on every write)
+//   One reaction per reader per paragraph. Rules can't loop over a map, so each
+//   write may change only the paragraph named by `last`, and only that entry is
+//   checked; the entries before it were checked when they were written. The
+//   number of documents is bounded by the book's chapters, so reactions need no
+//   daily quota. Only the approved owner can read and write; admins read via a
+//   collection group query on "reactions". Never deleted: removing a reaction
+//   removes its entry.
+//
 // Collection: book
 // Document ID: "meta"
 // Fields:
@@ -199,6 +214,32 @@ service cloud.firestore {
       return data.count == 1 && data.windowStart == request.time;
     }
 
+    function chapterPath(chapterId) {
+      return /databases/$(database)/documents/chapters/$(chapterId);
+    }
+
+    // Must match REACTIONS in js/reactions.js.
+    function isReactionKind(value) {
+      return value in ['loved', 'funny', 'moved', 'confused', 'dragging'];
+    }
+
+    // `before` is the marks map before this write. The paragraph must exist in the
+    // chapter (get() fails if the chapter doesn't), and its entry is either a known
+    // reaction or gone.
+    function isValidReactions(data, before, chapterId) {
+      let fields = ['marks', 'last', 'updatedAt'];
+      return hasOnlyAllowedFields(fields)
+        && hasRequiredFields(fields)
+        && data.marks is map
+        && data.marks.size() <= 5000
+        && data.last is string
+        && data.last.matches('^(0|[1-9][0-9]{0,3})$')
+        && int(data.last) < get(chapterPath(chapterId)).data.paragraphs.size()
+        && data.marks.diff(before).affectedKeys().hasOnly([data.last])
+        && (!(data.last in data.marks) || isReactionKind(data.marks[data.last]))
+        && data.updatedAt == request.time;
+    }
+
     function isValidMeta(data) {
       let fields = ['title', 'author', 'dedication', 'chapters', 'updatedAt'];
       return hasOnlyAllowedFields(fields)
@@ -275,6 +316,20 @@ service cloud.firestore {
         allow delete: if (isOwner(userId) && isApproved()) || isAdmin();
       }
 
+      match /reactions/{chapterId} {
+        allow read: if isOwner(userId) && isApproved();
+
+        allow create: if isOwner(userId)
+          && isApproved()
+          && isValidReactions(request.resource.data, {}, chapterId);
+
+        allow update: if isOwner(userId)
+          && isApproved()
+          && isValidReactions(request.resource.data, resource.data.marks, chapterId);
+
+        allow delete: if false;
+      }
+
       match /limits/{limitId} {
         allow read: if isOwner(userId) && isApproved();
 
@@ -316,6 +371,11 @@ service cloud.firestore {
 
     // Admins can read every reader's comments (collection group query).
     match /{path=**}/comments/{commentId} {
+      allow read: if isAdmin();
+    }
+
+    // Admins can read every reader's reactions (collection group query).
+    match /{path=**}/reactions/{chapterId} {
       allow read: if isAdmin();
     }
 

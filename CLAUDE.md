@@ -54,6 +54,14 @@ This is the public template. Each author deploys their own copy into their own F
   - **Daily limit:** each reader can make 300 comment creates and edits per day, counted in `users/{uid}/limits/commentWrites`, which is written in the same batch as the comment and names it. It bounds how many comments are stored, and so what the admin page reads. The limit is in both `firestore.rules` and `js/comments.js`.
     - **What it doesn't stop:** a script can still use up the free daily writes, because one batch can write the same comment up to 500 times for one +1. Every write in a batch is checked against the state before the batch, so rules can't tell the copies apart; the Firestore emulator confirmed this. On Spark that means saving fails until the next day and nothing is charged. Closing it fully would need Cloud Functions.
   - The comment icon changes colour when the paragraph has comments.
+- **Reactions:** in the comment sheet a reader can mark a paragraph Loved it, Funny, Moved, Confused or Dragging. "Confused" and "Dragging" are there because they tell the author what to fix.
+  - **One per paragraph:** tapping a reaction sets it, tapping another replaces it, and tapping it again removes it.
+  - **Private:** like comments, only the reader and admins see them. There are no public counts, which would sway other readers and can't be protected from tampering without Cloud Functions.
+  - **Storage:** one document per reader per chapter (`users/{uid}/reactions/{chapterId}`), not one per reaction, because the admin page reads them all on each load. Rules can't loop over a map, so each write names the one paragraph it changes in `last`, and only that entry is checked.
+  - **No daily limit:** the chapter must exist, so storage is bounded by the book. A script can still use up the free daily writes, as with comments.
+  - **Marker:** a reaction highlights the comment icon, with no count, and in scroll view the paragraph's badge shows the reaction's icon.
+  - **Admin page:** a Reactions section lists paragraphs by most reactions (top 50), filtered by chapter or reaction, for chapters still in the book. Reactions don't count toward the new comments badge.
+  - The reaction list is in both `firestore.rules` and `js/reactions.js`.
 - **Book text:** stored in Firestore and readable only by approved users. Admins publish it from `/admin/upload.html`, which parses `book.md` or a Word `.docx` in the browser. That page also shows the published book and can remove it: one batch deletes `book/meta` and every chapter, readers' comments are kept, and readers see that the book isn't published yet.
 - **Contents page with no book:** it hides the title, chapters and bookmarks and shows only a message. Admins also get a "Publish the book" button there.
 - **Sign-in screen:** below the Google button, a short note tells readers who write that Galleyleaf can share their book too, linking to `https://galleyleaf.web.app/` in a new tab.
@@ -87,6 +95,7 @@ This is the public template. Each author deploys their own copy into their own F
 | `users/{uid}` | `displayName`, `email`, `photoURL`, `approved`, `admin`, `createdAt` | Owner creates it once, with `approved: true` and `admin: false`. Owner and admins can read it. Admins can update `approved` only. |
 | `users/{uid}/comments/{id}` | `chapterId`, `paragraphIndex`, `text` (≤ 2000 chars), `createdAt`, `updatedAt` | Owner reads, writes and deletes while approved; each create or edit must advance the quota below. Admins read through a collection-group query and can delete. |
 | `users/{uid}/limits/commentWrites` | `count` (1–300), `windowStart`, `commentId`, `updatedAt` | Owner reads and writes while approved: +1 within a day of `windowStart`, or a new window at 1 after that. Never deleted. |
+| `users/{uid}/reactions/{chapterId}` | `marks` (paragraph index as a string → reaction id, ≤ 5000), `last` (the paragraph this write changes), `updatedAt` | Owner reads and writes while approved; each write changes only the entry named by `last`, for a paragraph that exists. Admins read through a collection-group query. Never deleted. |
 | `book/meta` | `title`, `author`, `dedication`, `chapters[{id,title,order,paragraphCount}]`, `updatedAt` | Approved users can read it. Admins can write it. |
 | `chapters/{id}` | `title`, `order`, `paragraphs[]` (HTML with only `<em>` and `<strong>`), `breaks[]` | Approved users and admins can read it. Admins can write it. |
 
@@ -158,10 +167,10 @@ Hosting serves the project root and ignores:
 
 ## Testing
 
-`tests/run-ui-tests.sh` runs 59 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
+`tests/run-ui-tests.sh` runs 70 checks in a real browser with `playwright-cli`. It needs `python3` and `playwright-cli`. The checks cover:
 - sign-in (including a reader's first sign-in), and removed and restored access
 - both reading views
-- comments (including the daily limit), bookmarks and chapter completion
+- comments (including the daily limit), reactions, bookmarks and chapter completion
 - the account menu, and removing the published book
 - the version footer and the update notice (GitHub's API is answered by the test)
 - the admin page, including a first sign-in that happens there, and the new comments badge
@@ -175,6 +184,7 @@ The test swaps the gstatic Firebase files for the mock in `tests/mock/`, which b
 - `localStorage["mock:fresh"] = "1"` starts with no profile, as on a first sign-in. Like Firestore, the new profile first reaches the listener as a pending local write and is confirmed 400 ms later; until then the book can't be read, as the rules can't see the profile yet.
 - `localStorage["mock:notReady"] = "N"` refuses the first N profile reads with `permission-denied`, as before new rules arrive.
 - `localStorage["mock:quotaUsed"] = "N"` starts the reader's daily comment count at N.
+- Other readers' reactions are fixed in the mock, for the admin page.
 - `localStorage["mock:noBook"] = "1"` means no book is published. Removing the book on the publish page sets it.
 
 When you change UI labels or ids, update `tests/ui-checks.js`. The security rules themselves are untested; the Firebase Emulator Suite would be the way to test them.
@@ -190,6 +200,7 @@ When you change UI labels or ids, update `tests/ui-checks.js`. The security rule
 | `js/book.js` | Loads `book/meta` and chapters, cached in memory and `sessionStorage` |
 | `js/reader.js` | Both reading views, bookmarks, comment sheet, chapter completion |
 | `js/comments.js` | Comment reads and writes |
+| `js/reactions.js` | Reaction list, reads and writes |
 | `js/account-menu.js` | The avatar menu shared by the reader and the admin pages |
 | `js/theme.js` | Light and dark theme, shared by the reader and the admin pages |
 | `js/site-version.js` | The admin pages' version footer and update notice |

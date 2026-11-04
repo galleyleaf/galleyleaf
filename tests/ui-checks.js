@@ -103,6 +103,34 @@ async (page) => {
     check("Comment icon is highlighted", await page.locator("#btn-comment").evaluate((b) => b.classList.contains("has-comments")));
     check("Comment badge shows the count", (await text("#comment-badge")) === "1", await text("#comment-badge"));
 
+    /* ---------- Reactions ---------- */
+    const reaction = (name) => page.locator("#reaction-row").getByRole("button", { name });
+    const isPressed = async (name) => (await reaction(name).getAttribute("aria-pressed")) === "true";
+    const highlighted = () => page.locator("#btn-comment").evaluate((b) => b.classList.contains("has-comments"));
+    await page.locator("#btn-next").click();
+    await wait(200);
+    await page.locator("#passage-text").click();
+    await wait(200);
+    check("The comment sheet offers five reactions", (await page.locator("#reaction-row .reaction").count()) === 5);
+    await reaction("Confused").click();
+    await wait(100);
+    check("Tapping a reaction selects it", await isPressed("Confused"));
+    await reaction("Funny").click();
+    await wait(100);
+    check("Another reaction replaces it", (await isPressed("Funny")) && !(await isPressed("Confused")));
+    await page.locator("#btn-close-comments").click();
+    check("A reaction highlights the comment icon, with no count", (await highlighted()) && !(await visible("#comment-badge")));
+    await page.locator("#passage-text").click();
+    await wait(200);
+    check("The sheet shows the saved reaction", await isPressed("Funny"));
+    await reaction("Funny").click();
+    await wait(100);
+    check("Tapping a reaction again removes it", !(await isPressed("Funny")));
+    await page.locator("#btn-close-comments").click();
+    check("Removing it clears the comment icon", !(await highlighted()));
+    await page.locator("#btn-prev").click();
+    await wait(200);
+
     check("Book text can't be selected", (await page.locator("#passage-text").evaluate((e) => getComputedStyle(e).userSelect)) === "none");
     const copyBlocked = await page.locator("#passage-text").evaluate((e) => !e.dispatchEvent(new Event("copy", { bubbles: true, cancelable: true })));
     check("Copying from the reader is blocked", copyBlocked);
@@ -152,6 +180,13 @@ async (page) => {
     await page.locator("#btn-close-comments").click();
     const badge = await page.locator(`.flow-p[data-index="${target}"] .flow-note`).count();
     check("Commented paragraph gets a badge", badge === 1, String(badge));
+    await page.locator(`.flow-p[data-index="${target}"]`).click({ position: { x: 5, y: 5 } });
+    await wait(200);
+    await page.locator("#reaction-row").getByRole("button", { name: "Moved" }).click();
+    await wait(100);
+    await page.locator("#btn-close-comments").click();
+    const noteIcon = await page.locator(`.flow-p[data-index="${target}"] .flow-note use`).getAttribute("href");
+    check("A paragraph's badge shows the reaction", noteIcon === "#i-moved", noteIcon);
 
     await page.locator("#btn-next").click();
     await wait(1000);
@@ -204,6 +239,12 @@ async (page) => {
     await page.keyboard.press("Escape");
     check("Admin page lists readers with access removed", (await page.locator("#pending-list li").count()) === 1);
     check("Admin page lists comments", (await page.locator("#comment-list li").count()) >= 1);
+    check("Admin page totals reactions", (await text("#reactions-count")) === "3", await text("#reactions-count"));
+    const topReaction = await text("#reaction-list li");
+    check("The most-reacted paragraph comes first", topReaction.includes("paragraph 5") && topReaction.includes("Confused 2"), topReaction);
+    await page.selectOption("#filter-reaction-kind", "loved");
+    check("Reactions filter by kind", (await page.locator("#reaction-list > li").count()) === 1 && (await text("#reaction-list > li")).includes("paragraph 2"));
+    await page.selectOption("#filter-reaction-kind", "");
     const before = await page.locator("#comment-list li").count();
     await evalPage(() => { window.confirm = () => true; });
     await page.locator("#comment-list li").first().getByRole("button", { name: "Delete" }).click();
